@@ -2,6 +2,7 @@ title: Improved Variational Autoencoders for Text Modeling using Dilated Convolu
 slug: improved-variational-autoencoders-for-text-modeling-using-dilated-convolutions
 date: 2017-09-30 21:10:03 UTC+03:00
 author: Артём Соболев
+link: https://arxiv.org/abs/1702.08139
 tags: mathjax, deep learning, dilated convolutions, generative models, text modeling, variational autoencoders
 
 # Мотивация
