@@ -1,7 +1,14 @@
+html {height: 100%; box-sizing: border-box}
+body {min-height: 100%; position: relative; padding-bottom: 3em}
+
 #footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
     text-align: center;
     font-size: 0.8em;
-    margin-top: 3em;
+    opacity: 0.5;
+    width: 100%;
 }
 
 .post-meta {
@@ -61,5 +68,12 @@
 .post-text img.medium { max-width: 60% }
 .post-text img.small { max-width: 40% }
 
-.paper-link {float: right; width: 64px; height: 64px; background: url(../images/paper.png) no-repeat; margin-top: 0.5em}
+.paper-link {display: none; float: right; width: 64px; height: 64px; background: url(../images/paper.png) no-repeat; margin-top: 0.5em}
+.postpage .paper-link {display: block}
 .paper-link a {color: transparent; display: block; width: 100%; height: 100%}
+
+.listpage > header,
+.tagpage > header { border-bottom: 3px dashed #efefef; padding-bottom: 1em; margin-bottom: 2em}
+
+.listpage > header h1,
+.tagpage > header h1 { text-align: center }

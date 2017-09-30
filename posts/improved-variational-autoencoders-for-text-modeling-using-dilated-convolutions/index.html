@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width">
-<title>Improved Variational Autoencoders for Text Modeling using Dilated Convolutions | Bayesian Summaries</title>
+<title>Improved Variational Autoencoders for Text Modeling using Dilated Convolutions | Codename 'Sufficient Statistics'</title>
 <link href="../../assets/css/rst.css" rel="stylesheet" type="text/css">
 <link href="../../assets/css/poole.css" rel="stylesheet" type="text/css">
 <link href="../../assets/css/lanyon.css" rel="stylesheet" type="text/css">
@@ -24,15 +24,14 @@ MathJax.Hub.Config({
     }
 });
 </script><!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="Артём Соболев">
-<link rel="prev" href="../self-normalizing-neural-networks/" title="Self-Normalizing Neural Networks" type="text/html">
-<link rel="next" href="../the-consciousness-prior/" title="The Consciousness Prior" type="text/html">
-<meta property="og:site_name" content="Bayesian Summaries">
+<link rel="prev" href="../the-consciousness-prior/" title="The Consciousness Prior" type="text/html">
+<meta property="og:site_name" content="Codename 'Sufficient Statistics'">
 <meta property="og:title" content="Improved Variational Autoencoders for Text Modeling using Dilated Conv">
 <meta property="og:url" content="http://bayesgroup.github.io/sufficient-statistics/posts/improved-variational-autoencoders-for-text-modeling-using-dilated-convolutions/">
 <meta property="og:description" content="Мотивация
 Речь пойдёт про вариационные автоэнкодеры для текста, что помогает, например, в unsupervised режиме находить хорошие фичи. Однако, если делать такой VAE по-наивному, то есть используя RNN эн">
 <meta property="og:type" content="article">
-<meta property="article:published_time" content="2017-09-07T09:53:00+03:00">
+<meta property="article:published_time" content="2017-09-30T21:10:03+03:00">
 <meta property="article:tag" content="deep learning">
 <meta property="article:tag" content="dilated convolutions">
 <meta property="article:tag" content="generative models">
@@ -64,7 +63,7 @@ MathJax.Hub.Config({
         <div class="container">
           
     <h3 id="brand" class="masthead-title">
-      <a href="../../" title="Bayesian Summaries" rel="home">Bayesian Summaries</a>
+      <a href="../../" title="Codename 'Sufficient Statistics'" rel="home">Codename 'Sufficient Statistics'</a>
     </h3>
 
         </div>
@@ -72,13 +71,9 @@ MathJax.Hub.Config({
 
       <div class="container content" id="content">
         
-<article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><div class="paper-link">
-        <a href="https://arxiv.org/abs/1702.08139">Paper</a>
-    </div>
-    <header><h1 class="post-title p-name entry-title" itemprop="headline name"><a href="." class="u-url">Improved Variational Autoencoders for Text Modeling using Dilated Convolutions</a></h1>
+<article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h1 class="post-title p-name entry-title" itemprop="headline name"><a href="." class="u-url">Improved Variational Autoencoders for Text Modeling using Dilated Convolutions</a></h1>
 
-
-    
+        
         <ul itemprop="keywords" class="tags">
 <li><a class="tag p-category" href="../../categories/deep-learning/" rel="tag">deep learning</a></li>
             <li><a class="tag p-category" href="../../categories/dilated-convolutions/" rel="tag">dilated convolutions</a></li>
@@ -88,16 +83,15 @@ MathJax.Hub.Config({
         </ul></header><div class="e-content entry-content" itemprop="articleBody text">
     <div>
 <h2>Мотивация</h2>
-<p>Речь пойдёт про вариационные автоэнкодеры для текста, что помогает, например, в unsupervised режиме находить хорошие фичи. Однако, если делать такой VAE по-наивному, то есть используя RNN энкодер и RNN декодер, то многие авторы рапортуют трудности обучения. На самом деле, проблема в том, что RNN уже достаточно мощная модель сама по себе и в состоянии моделировать языковую модель без дополнительной информации (в самом деле, любое распределение $p(x_1, ..., x_N)$ представляется в виде $\prod_j p(x_j | x_1, ..., x_{j-1})$, а рекурретные сети моделируют именно такие распределения)</p>
+<p>Речь пойдёт про вариационные автоэнкодеры для текста, что помогает, например, в unsupervised режиме находить хорошие фичи. Однако, если делать такой VAE по-наивному, то есть используя RNN энкодер и RNN декодер, то многие авторы рапортуют трудности обучения. На самом деле, проблема в том, что RNN уже достаточно мощная модель сама по себе и в состоянии моделировать языковую модель без дополнительной информации (в самом деле, любое распределение $p(x_1, \dots, x_N)$ представляется в виде $\prod_j p(x_j | x_1, \dots, x_{j−1})$, а рекурретные сети моделируют именно такие распределения).</p>
 <h2>Идея</h2>
 <p>Соответственно, раз обычные RNN-декодеры такие мощные, давайте заменим их на что-нибудь попроще. Таким чем-нибудь попроще авторы выбрали "дырявые свёртки" (dilated convolutions, чей дебют произошёл в статье про WaveNet, как я понимаю, <a href="https://www.quora.com/What-is-the-difference-between-dilated-convolution-and-convolution+stride">не путать с strided convolutions</a>). Как я понимаю, причина такого выбора в том, что даже относительно неглубокий декодер будет иметь достаточно широкую область видимости, т.е. уметь моделировать достаточно протяжённые локальные зависимости. Ожидаемо, путём увеличения глубины такого декодера мы будем увеличивать его мощность.</p>
 <p><img src="../../post-images/improved-variational-autoencoders-for-text-modeling-using-dilated-convolutions/architecture.png" class="medium"></p>
 <p>Авторы расматривают не только сам VAE, но и semi-supervised learning на его основе. Кроме того, такая модель умеет думать о метках класса, поэтому её естественно использовать для кластеризации, что авторы и делают.</p>
 <h2>Эксперименты</h2>
-<p>В качестве энкодера была взята обычная LSTM, а в качестве декодера – LSTM бейзлайн и 4 свёрточно-дырявых декодера разной глубины: <em>маленький</em>, <em>средний</em>, <em>большой</em> и <em>очень большой</em> (с областями видимости 16, 63, 125 и 187, соответственно). У LSTM бейзлайна получилась неплохая перплексити на задаче моделирования языка (на датасетах отзывов Yelp'а и Yahoo ответов), но он игнорировал скрытый код. В целом виден паттерн: чем меньше (и слабее) декодер, тем активнее он использует скрытый код, но тем сложнее ему выучить хорошую языковую модель. Оптимальным декодером получился <em>большой</em> свёрточно-дырявый, а <em>очень большой</em> работал хуже и код игнорировал.</p>
+<p>В качестве энкодера была взята обычная LSTM, а в качестве декодера – LSTM бейзлайн и 4 свёрточно-дырявых декодера разной глубины: маленький, средний, большой и очень большой (с областями видимости 16, 63, 125 и 187, соответственно). У LSTM бейзлайна получилась неплохая перплексити на задаче моделирования языка (на датасетах отзывов Yelp'а и Yahoo ответов), но он игнорировал скрытый код. В целом виден паттерн: чем меньше (и слабее) декодер, тем активнее он использует скрытый код, но тем сложнее ему выучить хорошую языковую модель. Оптимальным декодером получился большой свёрточно-дырявый, а очень большой работал хуже и код игнорировал.</p>
 <p><img src="../../post-images/improved-variational-autoencoders-for-text-modeling-using-dilated-convolutions/language-modeling-2.png"></p>
-<p>Собственно, зачем это всё делалось: хочется иметь хорошее скрытое представление (код), которое было бы полезно в других задачах. Для начала авторы делают его двумерным и показыают, как там топики (которые есть в датасете) кластеризуютя автоматически. Потом начинается semi-supervised learning, когда авторы на смешном количестве размеченных примеров (от 100 до 2000) довольно успешно (относительно существующих методов, сравнения с обучением "с нуля" не было) обучают supervised
-модель для классификации на 5 или 10 классов.</p>
+<p>Собственно, зачем это всё делалось: хочется иметь хорошее скрытое представление (код), которое было бы полезно в других задачах. Для начала авторы делают его двумерным и показыают, как там топики (которые есть в датасете) кластеризуютя автоматически. Потом начинается semi-supervised learning, когда авторы на смешном количестве размеченных примеров (от 100 до 2000) довольно успешно (относительно существующих методов, сравнения с обучением "с нуля" не было) обучают supervised модель для классификации на 5 или 10 классов.</p>
 <p><img src="../../post-images/improved-variational-autoencoders-for-text-modeling-using-dilated-convolutions/semi-supervised.png"></p>
 <p>Кроме того, в самом конце есть маленький примерчик того, как включение информации о метках класса в модель помогает в итоге генерировать (VAE же генеративная модель!) семплы, обуславливаясь на этот самый класс.</p>
 <p><img src="../../post-images/improved-variational-autoencoders-for-text-modeling-using-dilated-convolutions/semi-supervised-generative.png"></p>
@@ -105,12 +99,9 @@ MathJax.Hub.Config({
 <p>Простая идея, хорошие эксперименты, мне понравилось. Правда, я бы хотел посмотреть на такие же эксперименты с CNN декодером на обычных свёртках – receptive field у рассмотренной архитектуры, кажется, всё же излишне большой для текста.</p>
 </div>
     </div>
-    <aside class="postpromonav"><div class="post-meta">
-    
-        <span class="post-author">Артём Соболев</span>
-    <time class="post-date" datetime="2017-09-07T09:53:00+03:00" title="07 сентября 2017">07 сентября 2017</time>
-</div>
-    </aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">
+
+    <aside class="post-meta"><span class="post-author">Артём Соболев</span>
+    <time class="post-date published dt-published" datetime="2017-09-30T21:10:03+03:00" itemprop="datePublished" title="30 сентября 2017">30 сентября 2017</time></aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">
 MathJax.Hub.Config({
     tex2jax: {
         inlineMath: [ ['$','$'], ["\\(","\\)"] ],
@@ -122,16 +113,15 @@ MathJax.Hub.Config({
         styles: {'.MathJax_Display': {"margin": 0}}
     }
 });
-</script></article><footer id="footer"><p>Contents © 2017         <a href="mailto:info@bayesgroup.ru">BayesGroup</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
-            
-        </footer>
+</script></article>
 </div>
     </div>
     <label for="sidebar-checkbox" class="sidebar-toggle"></label>
     
     
-    
-            <script src="../../assets/js/jquery.min.js"></script><script src="../../assets/js/moment-with-locales.min.js"></script><script src="../../assets/js/fancydates.js"></script><!-- fancy dates --><script>
+        <footer id="footer"><p>Contents © 2017         <a href="mailto:info@bayesgroup.ru">BayesGroup</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
+            
+        </footer><script src="../../assets/js/jquery.min.js"></script><script src="../../assets/js/moment-with-locales.min.js"></script><script src="../../assets/js/fancydates.js"></script><!-- fancy dates --><script>
     moment.locale("ru");
     fancydates(2, "DD.MM.YYYY");
     </script><!-- end fancy dates -->

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width">
-<title>The Consciousness Prior | Bayesian Summaries</title>
+<title>The Consciousness Prior | Codename 'Sufficient Statistics'</title>
 <link href="../../assets/css/rst.css" rel="stylesheet" type="text/css">
 <link href="../../assets/css/poole.css" rel="stylesheet" type="text/css">
 <link href="../../assets/css/lanyon.css" rel="stylesheet" type="text/css">
@@ -24,13 +24,14 @@ MathJax.Hub.Config({
     }
 });
 </script><!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="Артём Соболев">
-<link rel="prev" href="../improved-variational-autoencoders-for-text-modeling-using-dilated-convolutions/" title="Improved Variational Autoencoders for Text Modeling using Dilated Convolutions" type="text/html">
-<meta property="og:site_name" content="Bayesian Summaries">
+<link rel="prev" href="../self-normalizing-neural-networks/" title="Self-Normalizing Neural Networks" type="text/html">
+<link rel="next" href="../improved-variational-autoencoders-for-text-modeling-using-dilated-convolutions/" title="Improved Variational Autoencoders for Text Modeling using Dilated Convolutions" type="text/html">
+<meta property="og:site_name" content="Codename 'Sufficient Statistics'">
 <meta property="og:title" content="The Consciousness Prior">
 <meta property="og:url" content="http://bayesgroup.github.io/sufficient-statistics/posts/the-consciousness-prior/">
 <meta property="og:description" content="Мини-заметка на 4 страницах о гипотетическом подходе к созданию RL агентов с механизмом сознания / изучению распутанных (disentangled) представлений, обильно политая баззвордом conscious (это слово в ">
 <meta property="og:type" content="article">
-<meta property="article:published_time" content="2017-09-26T10:49:21+03:00">
+<meta property="article:published_time" content="2017-09-26T20:56:03+03:00">
 <meta property="article:tag" content="attention">
 <meta property="article:tag" content="deep learning">
 <meta property="article:tag" content="mathjax">
@@ -59,7 +60,7 @@ MathJax.Hub.Config({
         <div class="container">
           
     <h3 id="brand" class="masthead-title">
-      <a href="../../" title="Bayesian Summaries" rel="home">Bayesian Summaries</a>
+      <a href="../../" title="Codename 'Sufficient Statistics'" rel="home">Codename 'Sufficient Statistics'</a>
     </h3>
 
         </div>
@@ -67,13 +68,9 @@ MathJax.Hub.Config({
 
       <div class="container content" id="content">
         
-<article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><div class="paper-link">
-        <a href="https://arxiv.org/abs/1709.08568">Paper</a>
-    </div>
-    <header><h1 class="post-title p-name entry-title" itemprop="headline name"><a href="." class="u-url">The Consciousness Prior</a></h1>
+<article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h1 class="post-title p-name entry-title" itemprop="headline name"><a href="." class="u-url">The Consciousness Prior</a></h1>
 
-
-    
+        
         <ul itemprop="keywords" class="tags">
 <li><a class="tag p-category" href="../../categories/attention/" rel="tag">attention</a></li>
             <li><a class="tag p-category" href="../../categories/deep-learning/" rel="tag">deep learning</a></li>
@@ -84,18 +81,15 @@ MathJax.Hub.Config({
 <p>Для выучивания распутанных представлений, т.е. таких, в которых одна компонента скрытого состояния влияет только на одно свойство рассматриваемого объекта (например, угол поворота лица по горизонали), предлагается завести т.н. сознающее состояние (conscious state), обращающее разреженное внимание (sparse attention) на первое скрытое состояние, выбирая только несколько его компонент и пытаясь сделать разумное утверждение о них, что бы это ни значило. В принципе, если две компоненты скрытого состояния регулируют одно и то же свойство, то мы по одному из них не сможем сделать разумных утверждений (однако, никаких гарантий, что этот фактор не свяжет поворт по горизонтали и по вертикали в поворот по диагонали, нет).</p>
 <h2>"Математика"</h2>
 <p>Предполагается, что у нас есть последовательность наблюдений $s_t$ (как обычно в RL) и мы крутим поверх неё RNN'ку (какая вам больше нравится), генерирующую нам на каждом шаге выход $h_t$ – это и есть наше скрытое представление, которое мы хотим сделать максимально распутанным.</p>
-<p>Теперь о том, как вычислять это самое сознающее состояние $c_t$: предлагается завести некую нейрость $C(h_t, c_{t-1}, z_t)$, которая будет обращать разреженное внимание на компоненты $h_t$, пользуясь контекстом $c_{t-1}$, а ещё добавим стохастичности для большего <del>веселья</del> разведования (exploration). Теперь о том, как мы всё-таки хотели бы обучать это сознающее состояние. Было бы очень круто, если бы мы таким образом могли предсказывать будущее, например, пусть мы хотим в момент времени $t$ делать какое-то предсказание о будущем в виде $c_t$, а через $k$ шагов проверять его с помощью $h_{t+k}$. Поэтому вводим ещё одну нейросеть $V(h_t, c_{t-k})$, которая будет делать именно это. Правда, с каким лоссом её обучать – непонятно  ¯\_(ツ)_/¯</p>
-<p>Экспериментов нет (во всей лабе из 100+ человек не нашлось желающих взяться за задачу?), но <del>вы держитесь</del> в заметке есть идеи о том, какие эксперименты можно было бы провести.</p>
+<p>Теперь о том, как вычислять это самое сознающее состояние $c_t$: предлагается завести некую нейрость $C(h_t,c_{t−1},z_t)$, которая будет обращать разреженное внимание на компоненты $h_t$, пользуясь контекстом $c_{t−1}$, а ещё добавим стохастичности для большего веселья разведования (exploration). Теперь о том, как мы всё-таки хотели бы обучать это сознающее состояние. Было бы очень круто, если бы мы таким образом могли предсказывать будущее, например, пусть мы хотим в момент времени $t$ делать какое-то предсказание о будущем в виде $c_t$, а через $k$ шагов проверять его с помощью $h_{t+k}$. Поэтому вводим ещё одну нейросеть $V(h_t,c_{t−k})$, которая будет делать именно это. Правда, с каким лоссом её обучать – непонятно ¯\_(ツ)_/¯</p>
+<p>Экспериментов нет (во всей лабе из 100+ человек не нашлось желающих взяться за задачу?), но вы держитесь в заметке есть идеи о том, какие эксперименты можно было бы провести.</p>
 <h2>Резюме</h2>
-<p>В общем-то интересные мысли о возможной архитектуре, которые, правда, нужно додумывать самостоятельно (особенно $V(h_t, c_{t-k})$). Но идеи без экспериментов – дело сомнительное.</p>
+<p>В общем-то интересные мысли о возможной архитектуре, которые, правда, нужно додумывать самостоятельно (особенно $V(h_t,c_{t−k})$. Но идеи без экспериментов – дело сомнительное.</p>
 </div>
     </div>
-    <aside class="postpromonav"><div class="post-meta">
-    
-        <span class="post-author">Артём Соболев</span>
-    <time class="post-date" datetime="2017-09-26T10:49:21+03:00" title="26 сентября 2017">26 сентября 2017</time>
-</div>
-    </aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">
+
+    <aside class="post-meta"><span class="post-author">Артём Соболев</span>
+    <time class="post-date published dt-published" datetime="2017-09-26T20:56:03+03:00" itemprop="datePublished" title="26 сентября 2017">26 сентября 2017</time></aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">
 MathJax.Hub.Config({
     tex2jax: {
         inlineMath: [ ['$','$'], ["\\(","\\)"] ],
@@ -107,16 +101,15 @@ MathJax.Hub.Config({
         styles: {'.MathJax_Display': {"margin": 0}}
     }
 });
-</script></article><footer id="footer"><p>Contents © 2017         <a href="mailto:info@bayesgroup.ru">BayesGroup</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
-            
-        </footer>
+</script></article>
 </div>
     </div>
     <label for="sidebar-checkbox" class="sidebar-toggle"></label>
     
     
-    
-            <script src="../../assets/js/jquery.min.js"></script><script src="../../assets/js/moment-with-locales.min.js"></script><script src="../../assets/js/fancydates.js"></script><!-- fancy dates --><script>
+        <footer id="footer"><p>Contents © 2017         <a href="mailto:info@bayesgroup.ru">BayesGroup</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
+            
+        </footer><script src="../../assets/js/jquery.min.js"></script><script src="../../assets/js/moment-with-locales.min.js"></script><script src="../../assets/js/fancydates.js"></script><!-- fancy dates --><script>
     moment.locale("ru");
     fancydates(2, "DD.MM.YYYY");
     </script><!-- end fancy dates -->
