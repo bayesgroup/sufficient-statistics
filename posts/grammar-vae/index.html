@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " vocab="http://ogp.me/ns" lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>Grammar Variational Autoencoder | Codename 'Sufficient Statistics'</title>
+<link href="../../assets/css/rst.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/poole.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/lanyon.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/code.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/custom.css" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=PT+Serif:400,400italic,700%7CPT+Sans:400">
+<link rel="canonical" href="http://bayesgroup.github.io/sufficient-statistics/posts/grammar-vae/">
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script><!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="Надежда Чиркова">
+<link rel="prev" href="../riemannian-approach-to-batch-normalization/" title="Riemannian approach to Batch Normalization" type="text/html">
+<meta property="og:site_name" content="Codename 'Sufficient Statistics'">
+<meta property="og:title" content="Grammar Variational Autoencoder">
+<meta property="og:url" content="http://bayesgroup.github.io/sufficient-statistics/posts/grammar-vae/">
+<meta property="og:description" content="Мотивация
+Авторы статьи ставят задачу обучать вариационные автокодировщики для строк, которые задаются контекстно-свободной грамматикой (компьютерные программы, арифметические выражения, формулы молек">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2017-10-16T03:17:38+03:00">
+<meta property="article:tag" content="deep learning">
+<meta property="article:tag" content="mathjax">
+<meta property="article:tag" content="sequence modeling">
+<meta property="article:tag" content="variational autoencoders">
+</head>
+<body>
+    <a href="#content" class="sr-only sr-only-focusable">Перейти к главному содержимому</a>
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+            styles, `#sidebar-checkbox` for behavior. -->
+    <input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox"><!-- Toggleable sidebar --><div class="sidebar" id="sidebar">
+        <div class="sidebar-item">
+            <p>Обзоры не являются официальной позицией группы и предназначены исключительно для внутреннего использования.</p>
+        </div>
+        
+    <nav id="menu" role="navigation" class="sidebar-nav"><a class="sidebar-nav-item" href="../../authors/">Авторы</a>
+        <a class="sidebar-nav-item" href="../../archive.html">Архив</a>
+        <a class="sidebar-nav-item" href="../../categories/">Тэги</a>
+    
+    
+    </nav>
+</div>
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+          
+    <h3 id="brand" class="masthead-title">
+      <a href="../../" title="Codename 'Sufficient Statistics'" rel="home">Codename 'Sufficient Statistics'</a>
+    </h3>
+
+
+        </div>
+      </div>
+
+      <div class="container content" id="content">
+        
+<article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><div class="paper-link">
+        <a href="https://arxiv.org/abs/1703.01925">Paper</a>
+    </div>
+    <header><h1 class="post-title p-name entry-title" itemprop="headline name"><a href="." class="u-url">Grammar Variational Autoencoder</a></h1>
+
+        
+        <ul itemprop="keywords" class="tags">
+<li><a class="tag p-category" href="../../categories/deep-learning/" rel="tag">deep learning</a></li>
+            <li><a class="tag p-category" href="../../categories/sequence-modeling/" rel="tag">sequence modeling</a></li>
+            <li><a class="tag p-category" href="../../categories/variational-autoencoders/" rel="tag">variational autoencoders</a></li>
+        </ul></header><div class="e-content entry-content" itemprop="articleBody text">
+    <div>
+<h2>Мотивация</h2>
+<p>Авторы статьи ставят задачу обучать вариационные автокодировщики для строк, которые задаются контекстно-свободной грамматикой (компьютерные программы, арифметические выражения, формулы молекул). Проблема применения к ним обычных character-based VAE в том, что часто строка, сгенерированная из некоторого вектора внутреннего представления, не является валидной, то есть не выводится из грамматики. Предлагается новая модель Grammar VAE, которая всегда генерирует валидные строки.</p>
+<h2>Описание модели</h2>
+<p><em>Напоминание</em>. Контекстно-свободная грамматика задается четверкой: $ V$ – множество нетерминалов, $\Sigma$ – множество терминалов (алфавит символов строки), $S$ – выделенный стартовый нетерминал и $R$ – множество правил вывода вида $\alpha \rightarrow \beta$, $\alpha \in V$, $\beta \in (V \cup \Sigma)^*$, все множества конечны. Каждая строка порождается цепочкой правил вывода, причем в первом правиле слева стоит $S$, а каждое правило применяется к самому левому подходящему нетерминалу в текущем виде строки. Пример <a href="http://mathhelpplanet.com/static.php?p=kontekstno-svobodnyye-yazyki-i-grammatiki">тут</a>.</p>
+<p><strong>Кодировщик</strong>: $q(z|x)$. Вместо того, чтобы работать со строкой как с последователньостью символов, будем представлять строку в виде цепочки правил вывода и обозначать $x$. Обозначим длину этой цепочки $T(x)$, а $K=|R|$ – число правил вывода. Тогда цепочка $x$ может быть задана в виде бинарной матрицы размера $T(x) \times K$, у которой в каждой строке ровно 1 единица (соответствующая применяемому правилу). В виде этой матрицы строка и подается на вход кодировщика. Предложное распределение $q(z|x)$ стандартно задается в виде факторизованного нормального распределения со средним и дисперсией, возвращаемыми нейросетью (3 сверточных слоя и 2 полносвязных).</p>
+<p><strong>Декодировщик</strong>: $p(x|z)$. Опишем сначала процесс того, как декодировщик генерирует цепочку правил $x$ из скрытого представления $z$, а затем запишем правдоподобие  $p(x|z)$ для этого процесса. Нам понадобится бинарная матрица $M$ размера $|V| \times K$, каждый элемент ($\alpha,\, k$) – индикатор того, что в $k$-м правиле вывода слева стоит нетерминал $\alpha$. Процесс генерации начинается с того, что декодировщик пропускает $z$ через рекуррентную нейронную сеть, которая возвращает последовательность векторов $f_1, \dots, f_{T_{max}}$, $f_t \in \mathbb{R}^K$. Дальше повторять $T_{max}$ раз: достаем с верхушки стека нетерминал $\alpha$,  берем его бинарную маску $m_\alpha$, составляем дискретное распределение над допустимыми правилами вывода:</p>
+<p>$$
+   p(x_t=k|\alpha, z) = \frac{m_{\alpha, k} \, \exp(f_{t,k})}{\sum_{j=1}^K m_{\alpha, j} \, \exp(f_{t,j})},
+$$</p>
+<p>семплируем из него допустимое правило вывода, применяем его, и добавляем в стек все нетерминалы из правой части этого правила в обратном порядке. Распределение $p(x_t=k|\alpha, z) $ присваивает ненулевую вероятность только тем правилам, у которых в левой части стоит текущий нетерминал $\alpha$. Процесс может (и, вообще говоря, должен) закончиться раньше, если на стеке не осталось нетерминалов и строка уже выведена; для этого случая вводится специальное "пустое" правило грамматики, которым заполняется остаток цепочки $x$. Правдоподобие цепочки $x$ для скрытого представления $z$ задается как</p>
+<p>$$
+   p(x|z) = \prod_{t=1}^{T_{max}} p(x_t|z).
+$$</p>
+<p><strong>Обучение</strong>:  Модель обучается максимизацией вариационной нижней оценки</p>
+<p>$$
+   \mathcal{L}(\phi, \theta, x) = \mathbb{E}_{q_\phi(z|x)} \log p_\theta(x|z) - KL(q_\phi(z|x)||p(z)),
+$$
+$\phi$ – параметры сверточной нейросети кодировщика, $\theta$ – параметры рекуррентной сети декодировщика, $p(z)$ – стандартное многомерное нормальное распределение. Интеграл в матожидании берется семплированием, для получения несмещенной оценки применяется reparametrization trick.</p>
+<h2>Эксперименты</h2>
+<p>В экспериментах авторы показывают, что Grammar VAE создает более гладкие представления строк в том смысле, что при малом сдвиге в пространстве скрытых переменных мы получаем малое изменение в строке. Например, это демонстрируется на задаче "интерполяции" арифметических выражений (в каждом блоке жирные строки – две точки в пространстве скрытых представлений, строки между ними получаются в результате сдвига по отрезку между этими точками, красным выделены невалидные строки):</p>
+<p><img src="../../post-images/grammar-vae/interpolation.png" class="medium"></p>
+<p>Количественная оценка для этих данных проводится на задаче поиска арифметического выражения, хорошо описывающего зависимость заданного вектора абсцисс от ординат (целевое свойство). Например, выражение $x \, \sin (x)$ хорошо описывает пару векторов $(0, 1.57, 3.14)$, $(0,  1.57, 0)$. После обучения GVAE обучается еще одна дискриминативная сеть, предказывающая по $z$, подходит ли соответствующая ей строка для пары векторов. Используя градиент этой нейросети, можно двигаться по пространству и искать хорошее $z$. Чтобы минимизировать количество проверок найденных строк на обладание целевым свойством (для некоторых задач проверка может быть дорогостоящей), поиск строки проводится с помощью байесовской оптимизации. GVAE значительно опережает CVAE на этой задаче вновь благодаря гладкости пространства скрытых перемнных.</p>
+<p>Аналогичные эксперименты проведены для датасета с молекулами.</p>
+<h2>Размышления</h2>
+<p>На мой взгляд, в статье две важных идеи, которые не очень новы, но применены в интеренсом контесте генерации строк из некого подмножества всех возможных строк. Первая, простая идея –  рассматривать вместо строк  цепочку действий из конечного множества, порождающих строку. Вторая –  взять существующий процесс генерации чего-либо (в данном случае строк из скрытых представлений), записать в виде распределения (в данном случае генеративного распределения) и сделать из этого байесовскую модель.  </p>
+<p>Контекстно-свободные грамматики хорошо подходят для реализации этих идей, потому что имеют конечное и не очень большое количество правил. Можно использовать более узкий класс грамматик – регулярные грамматики. Этими двумя типами грамматик задается достаточно много типов данных. Поскольку в естественном языке (например, английском) синтаксис тоже задается контекстно-свободной грамматикой, можно использовать Grammar VAE для генерации синтаксически корректных предложений. Правда, понадобится допонительно учитывать семантику текста, добавив, к примеру, еще одну рекуррентную сеть в декодировщик, преобразующую последовательность синтаксических единиц в слова.</p>
+<p>Авторы отдельно отмечают, что поскольку модели явно сообщается, какова структура моделируемого объекта, ей не надо выучивать это из данных (как это происходит с character based VAE), и она может сосредоточиться на выучивании семинатики данных.</p>
+</div>
+    </div>
+
+    <aside class="post-meta"><a class="post-author" href="../../authors/nadezhda-chirkova/">Надежда Чиркова</a>
+    <time class="post-date published dt-published" datetime="2017-10-16T03:17:38+03:00" itemprop="datePublished" title="16 октября 2017">16 октября 2017</time></aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script></article>
+</div>
+    </div>
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+    
+    
+        <footer id="footer"><p>Contents © 2017         <a href="mailto:info@bayesgroup.ru">BayesGroup</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
+            
+        </footer><script src="../../assets/js/jquery.min.js"></script><script src="../../assets/js/moment-with-locales.min.js"></script><script src="../../assets/js/fancydates.js"></script><!-- fancy dates --><script>
+    moment.locale("ru");
+    fancydates(2, "DD.MM.YYYY");
+    </script><!-- end fancy dates -->
+</body>
+</html>
