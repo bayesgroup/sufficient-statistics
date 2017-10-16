@@ -1,6 +1,6 @@
 ---
 title: Learning Continuous Control Policies by Stochastic Value Gradients
-slug: learning-continuous-control-policies-by-stochastic-value-gradients.md
+slug: learning-continuous-control-policies-by-stochastic-value-gradients
 date: 2017-10-16 12:00:00 UTC+03:00
 author: Артём Соболев
 link: https://arxiv.org/abs/1510.09142
