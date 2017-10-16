@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " vocab="http://ogp.me/ns" lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>Learning Continuous Control Policies by Stochastic Value Gradients | Codename 'Sufficient Statistics'</title>
+<link href="../../assets/css/rst.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/poole.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/lanyon.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/code.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/custom.css" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=PT+Serif:400,400italic,700%7CPT+Sans:400">
+<link rel="canonical" href="http://bayesgroup.github.io/sufficient-statistics/posts/learning-continuous-control-policies-by-stochastic-value-gradients.md/">
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script><!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="Артём Соболев">
+<link rel="prev" href="../grammar-vae/" title="Grammar Variational Autoencoder" type="text/html">
+<meta property="og:site_name" content="Codename 'Sufficient Statistics'">
+<meta property="og:title" content="Learning Continuous Control Policies by Stochastic Value Gradients">
+<meta property="og:url" content="http://bayesgroup.github.io/sufficient-statistics/posts/learning-continuous-control-policies-by-stochastic-value-gradients.md/">
+<meta property="og:description" content="Мотивация
+Policy gradients методы типично считают градиент целевой функции (ожидаемой награды) с помощью REINFORCE aka score function оценки. Такие градиентные оценки, как известно, обладают высокой д">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2017-10-16T12:00:00+03:00">
+<meta property="article:tag" content="mathjax">
+<meta property="article:tag" content="reinforcement learning">
+<meta property="article:tag" content="reparametrization trick">
+</head>
+<body>
+    <a href="#content" class="sr-only sr-only-focusable">Перейти к главному содержимому</a>
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+            styles, `#sidebar-checkbox` for behavior. -->
+    <input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox"><!-- Toggleable sidebar --><div class="sidebar" id="sidebar">
+        <div class="sidebar-item">
+            <p>Обзоры не являются официальной позицией группы и предназначены исключительно для внутреннего использования.</p>
+        </div>
+        
+    <nav id="menu" role="navigation" class="sidebar-nav"><a class="sidebar-nav-item" href="../../authors/">Авторы</a>
+        <a class="sidebar-nav-item" href="../../archive.html">Архив</a>
+        <a class="sidebar-nav-item" href="../../categories/">Тэги</a>
+    
+    
+    </nav>
+</div>
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+          
+    <h3 id="brand" class="masthead-title">
+      <a href="../../" title="Codename 'Sufficient Statistics'" rel="home">Codename 'Sufficient Statistics'</a>
+    </h3>
+
+
+        </div>
+      </div>
+
+      <div class="container content" id="content">
+        
+<article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><div class="paper-link">
+        <a href="https://arxiv.org/abs/1510.09142">Paper</a>
+    </div>
+    <header><h1 class="post-title p-name entry-title" itemprop="headline name"><a href="." class="u-url">Learning Continuous Control Policies by Stochastic Value Gradients</a></h1>
+
+        
+        <ul itemprop="keywords" class="tags">
+<li><a class="tag p-category" href="../../categories/reinforcement-learning/" rel="tag">reinforcement learning</a></li>
+            <li><a class="tag p-category" href="../../categories/reparametrization-trick/" rel="tag">reparametrization trick</a></li>
+        </ul></header><div class="e-content entry-content" itemprop="articleBody text">
+    <h1 id="мотивация">Мотивация</h1>
+<p>Policy gradients методы типично считают градиент целевой функции (ожидаемой награды) с помощью REINFORCE aka score function оценки. Такие градиентные оценки, как известно, обладают высокой дисперсией и требуют дополнительных хитростей для её уменьшения. Вместе с тем людям, занимающимся генеративными моделями (особенно VAE), известно, что репараметризация позволяет получать градиентные оценки, на практике обладающие гораздо меньшей дисперсией. Поэтому в этой статье предлагается привнести этот опыт в область обучения с подкреплением.</p>
+<h1 id="математика">Математика</h1>
+<p>Наша задача – максимизировать ожидаемую кумулятивную награду, стартовав из состояния <span class="math inline">\(s_0 \sim p(x_0)\)</span>: <span class="math display">\[
+J(\theta) = \mathbb{E}\left[R(a_0, s_0) + \gamma R(a_1, s_1) + \gamma^2 R(a_2, s_2) + \dots \mid s_0\right] \to \max_{\theta}
+\]</span></p>
+<p>Где <span class="math inline">\(a_t \sim \pi_\theta(a_t \mid s_t)\)</span> – наша параметрическая политика, и <span class="math inline">\(s_{t+1} \sim p(s_{t+1}\mid a_t, s_t)\)</span> – динамика среды, <span class="math inline">\(R\)</span> – награда. Ожидаемо, если мы хотим делать по-сути end-to-end обучение, нам нужно иметь дифференцируемую модель среды и дифференцируемую награду. Но их можно попробовать выучить.</p>
+<p>Заметим, что мы, на самом деле, оптимизируем ожидаемую value-функцию начального состояния: <span class="math inline">\(J(\theta) = \mathbb{E}_{p(s_0)} V^{\pi_\theta}(s_0)\)</span>. Чтобы оптимизировать её как мы любим – стохастическим градиентным подъёмом, то есть – нужно лишь откуда-то достать <span class="math inline">\(\nabla_\theta V^{\pi_\theta} (s_0)\)</span>. Можно получить его прямо из этой формулы, а можно воспользоваться уравнением Беллмана, чтобы записать то же, но более компактно (с помощью рекурсивной формулы).</p>
+<p>Вспоминаем уравнение Беллмана, описывающее value-функцию для политики <span class="math inline">\(\pi\)</span>: <span class="math display">\[
+V^{\pi}(s) = \mathbb{E}_{\pi(a|s)} \left[ R(a, s) + \gamma \mathbb{E}_{p(s'|a, s)} V^{\pi}(s') \right]
+\]</span></p>
+<h2 id="детерминированный-случай">Детерминированный случай</h2>
+<p>Для начала посмотрим, как градиенты выглядят в детерминированном случае. Пусть политика у нас детерминированная: <span class="math inline">\(\pi_\theta(a|s) = \delta(a-a(s|\theta))\)</span>, <span class="math inline">\(a(s|\theta)\)</span> генерирует действие для заданного состояния. И среда тоже детерминированная, т.е. <span class="math inline">\(p(s'|a, s) = \delta(s' - s'(a, s))\)</span> (я обозначаю <span class="math inline">\(a\)</span> и случайную величину действия и <span class="math inline">\(a(s|\theta)\)</span> функцию, генерирующую её детерминированное значение, аналогично с <span class="math inline">\(s'\)</span>. В дальнейших формулах они будут взаимозменяемы). Тогда все мат. ожидания в уравнении Беллмана пропадают: <span class="math display">\[
+V^{\pi_\theta}(s) = R(a, s) + \gamma V^{\pi_\theta}(s')
+\]</span></p>
+<p>Отсюда градиент <span class="math inline">\(\nabla_\theta V^{\pi_\theta}\)</span>: <span class="math display">\[
+\nabla_\theta V^{\pi_\theta} (s)
+= \nabla_a R \nabla_\theta a + \gamma \Bigl( \nabla_{s'} V^{\pi_\theta}(s') \nabla_a s' \nabla_\theta a + \nabla_\theta V^{\pi_\theta}(s')\Bigr)
+\]</span> Выражение для <span class="math inline">\(V^{\pi_\theta}_{s'}\)</span> получается из тех же соображений: <span class="math display">\[
+\nabla_s V^{\pi_\theta} (s)
+= \nabla_a R \nabla_s a(s|\theta) + \nabla_s R + \gamma \nabla_{s'} V^{\pi_\theta}(s') \Bigl( \nabla_s s' + \nabla_a s' \nabla_s a \Bigr)
+\]</span></p>
+<p>Тут я перемешал полные производные с частными, опустил аргументы, а ещё в написанных формулах не сходятся размерности, но заинтересованный читатель сможет восстановить смысл написанных формул. Последнее слагаемое в скобках в выражении для <span class="math inline">\(\nabla_\theta V^{\pi_\theta}\)</span> приходит от того, что <span class="math inline">\(V^{\pi_\theta}(s')\)</span> зависит не только от текущего действия <span class="math inline">\(a\)</span>, но и от всех будущих (если всё ещё непонятно, то смотри в аппендиксе статьи).</p>
+<p>Эти уравнения связывают градиент value-функции в текущем состоянии с value-функцией в следующем состоянии. В терминальном состоянии у нас не будет следующего состояния, поэтому чтобы посчитать градиент value-функции в начальном состоянии нужно просто пересчитывать градиенты в обратном по траектории направлении.</p>
+<h2 id="стохастический-случай">Стохастический случай</h2>
+<p>В общем-то, обобщение детерминированного случая на стохастический очевидно любому человеку, знакомому с репараметризацией: по-сути нужно просто добавить в <span class="math inline">\(a\)</span> и <span class="math inline">\(s'\)</span> случайности в нужном месте (например, если действия нормально распределены <span class="math inline">\(a(s|\theta) \sim \mathcal{N}(\mu_a(s|\theta), \sigma^2_a(s|\theta))\)</span>, то <span class="math inline">\(a(s, \varepsilon|\theta) = \mu_a(s|\theta) + \sigma_a(s|\theta) \varepsilon\)</span>). Тогда уравнение Беллмана выглядит следующим образом:</p>
+<p><span class="math display">\[
+V^{\pi_\theta}(s) = \mathbb{E}_{\varepsilon \sim \mathcal{N}(0, I)} \left[ R(a(s, \varepsilon|\theta), s) + \gamma \mathbb{E}_{\xi \sim \mathcal{N}(0, I)} V^{\pi_\theta}( s'(s, a(s, \varepsilon|\theta), \xi ) ) \right]
+\]</span></p>
+<p>Мы не дифференцируем по <span class="math inline">\(\varepsilon\)</span> и <span class="math inline">\(\xi\)</span>, поэтому стохастические оценки градиента <span class="math inline">\(\nabla_\theta V^{\pi_\theta}\)</span> будут выглядеть так же, как и в детерминированном случае, появятся только дополнительные аргументы <span class="math inline">\(\xi\)</span> и <span class="math inline">\(\varepsilon\)</span>.</p>
+<h2 id="svg">SVG(∞)</h2>
+<p>И всё бы ничего, но на практике мы, как правило, не знаем модель среды <span class="math inline">\(s'(s, a, \xi)\)</span>. Мы, конечно, заменим её на что-то выученное <span class="math inline">\(\hat s'(s, a, \xi|\phi)\)</span>, но в таком случае наши <span class="math inline">\(\xi\)</span> и <span class="math inline">\(\varepsilon\)</span> не будут соответствовать семплам из среды <span class="math inline">\(a_t\)</span> и <span class="math inline">\(s_{t+1}\)</span>. Однако, благодаря Байесу можно переписать оценки градиентов в терминах семплов <span class="math inline">\(a\)</span> и <span class="math inline">\(s'\)</span>, а <span class="math inline">\(\xi\)</span> и <span class="math inline">\(\varepsilon\)</span> на них обусловиться. А именно, мы получаем</p>
+<p><span class="math display">\[
+\nabla_\theta V^{\pi_\theta} (s)
+=
+\mathbb{E}_{\pi_\theta(a|s)}
+\mathbb{E}_{p(s'|s, a)}
+\mathbb{E}_{p(\varepsilon, \xi|s, a, s')}
+\left[
+\nabla_a R \nabla_\theta a + \gamma \Bigl( \nabla_{s'} V^{\pi_\theta}(s') \nabla_a \hat{s}' \nabla_\theta a + \nabla_\theta V^{\pi_\theta}(s')\Bigr)
+\right]
+\]</span></p>
+<p>Аналогично для <span class="math inline">\(\nabla_s V^{\pi_\theta}(s)\)</span>. При некоторых предположениях (например, гауссовости всего на свете) можно аналитически найти <span class="math inline">\(p(\xi, \varepsilon|s, a, s')\)</span>.</p>
+<p>Кстати, бесконечность в названии метода от того, что мы должны доиграть эпизод до конца, прежде чем сможем посчитать градиент и чему-нибудь обучиться.</p>
+<p>Алгоритм получается такой:</p>
+<p><img src="../../post-images/learning-continuous-control-policies-by-stochastic-value-gradients/svg-inf-alg.png" class="medium"></p>
+<h2 id="svg1">SVG(1)</h2>
+<p>Всё здорово, но вышеописанный алгоритм может иметь очень высокую дисперсию из-за необходимости "раскрутить" эпизод до конца. Кроме того, это on-policy алгоритм, т.е. он не умеет в experience replay. Можно было бы сделать Importance Sampling для превращения его в off-policy, но тогда весами были бы отношения вероятностей всех траекторий, что раздуло бы дисперсию ещё больше.</p>
+<p>Поэтому предлагается два нововведения:</p>
+<ul>
+<li>Критик <span class="math inline">\(\hat V(s|\nu)\)</span>, приближающий <span class="math inline">\(\mathbb{E} V(s)\)</span>. Теперь мы вместо односемпловой Монте Карло оценки <span class="math inline">\(\nabla_s V^{\pi_\theta} (s)\)</span> будем использовать производную критика <span class="math inline">\(\nabla_s \hat V(s|\nu)\)</span>, в котором, как мы надеемся, вся случайность выинтегрирована.</li>
+<li>Давайте раскручивать эпизод только на один шаг вперёд. По-сути, это эквивалетно удалению члена <span class="math inline">\(\nabla_\theta V^{\pi_\theta}(s')\)</span> из формулы градиента <span class="math inline">\(\nabla_\theta V^{\pi_\theta} (s)\)</span>. Тогда можно делать off-policy обучение (и, соответственно, experience replay) с помощью Importance Sampling'а, ведь корректирующими весами будут не отношения вероятностей всех траекторий, а лишь отношение вероятностей конкретных действий <a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a>.</li>
+</ul>
+<p>Алгоритм получается такой: <img src="../../post-images/learning-continuous-control-policies-by-stochastic-value-gradients/svg-1-alg.png" class="medium"></p>
+<p>Можно, конечно, рассмотреть SVG(k) для разных k, а можно пойти дальше и вспомнить про TD(λ). И правда, если заглянуть в исходники статьи (доступны на архиве), то можно обнаружить упоминание некоего SVG(λ), который представляет собой λ-интерполяцию между раскруткой эпизода до конца и использованием критика для следующего шага. То есть, формула градиента value-функции по состоянию будет выглядеть так:</p>
+<p><span class="math display">\[
+\nabla_s V^{\pi_\theta} (s) =
+\mathbb{E}_{\pi(a|s)}
+\mathbb{E}_{p(s'|s, a)}
+\mathbb{E}_{p(\varepsilon, \xi|s, a, s')}
+\left[
+\nabla_a R \nabla_s a + \nabla_s R + \gamma \nabla_{s'} \tilde V^{\pi_\theta}_{\lambda}(s') \Bigl( \nabla_s \hat{s}' + \nabla_a \hat{s}' \nabla_s a \Bigr)
+\right]
+\]</span></p>
+<p>Где <span class="math inline">\(\tilde V^{\pi}_{\lambda}(s) = \lambda V^{\pi}(s) + (1-\lambda) \hat V(s|\nu)\)</span>. Однако, не стоит придавать этой формуле большого значения, её ведь удалили из итоговой статьи (и experience replay с ней не работает).</p>
+<h2 id="svg0">SVG(0)</h2>
+<p>Пока мы обсуждали только model-based подход, считая, что модель достаточно просто выучить (в сравнении со сложность изучения <span class="math inline">\(Q\)</span>-функции). Если это не так, то можно выучить <span class="math inline">\(Q\)</span>-функцию и делать model-free подход. Для этого предлагается следующий алгоритм (я уверен, авторы забыли IS коэффициент).</p>
+<p><img src="../../post-images/learning-continuous-control-policies-by-stochastic-value-gradients/svg-0-alg.png" class="medium"></p>
+<p>Обоснование этому примерно такое, что \[ J() = <em>{s_0} </em>{_(a|s_0)} Q(a, s_0) \]</p>
+<p>Это получается такой забавный Q-learning, где мы пользуется не ε-жадной политикой, а какой-то выученной.</p>
+<h1 id="эксперименты">Эксперименты</h1>
+<p>Сначала авторы показывают, как важно то, что они сумели обсуловиться на реальные траектории – иначе ошибка слишком сильно накапливается. Потом они сравниваются с Deterministic Policy Gradients.</p>
+<p><img src="../../post-images/learning-continuous-control-policies-by-stochastic-value-gradients/svg-exp1.png"></p>
+<p>Далее идут сравнения предложенных методов с DPG и Actor-Critic'ом в двух средах различной сложности (плюс см. следующий график). Средний график измеряет чувствительность предложенных алгоритмов к модели среды – SVG(∞) ломается довольно сильно при ухудшении среды, а вот SVG(1) – нет. <img src="../../post-images/learning-continuous-control-policies-by-stochastic-value-gradients/svg-exp2.png"></p>
+<p>Вот ещё эксперименты, как утверждают авторы, в более сложных средах: <img src="../../post-images/learning-continuous-control-policies-by-stochastic-value-gradients/svg-exp3.png"></p>
+<div class="footnotes">
+<hr>
+<ol>
+<li id="fn1"><p>Вообще, конечно, наша генеративная модель состояний тоже меняется по ходу обучения и надо бы сделать поправку и на это тоже, т.е. добавить IS веса для нового состояния, однако, авторы утверждают, что "this is widely considered to be intractable".<a href="#fnref1">↩</a></p></li>
+</ol>
+</div>
+    </div>
+
+    <aside class="post-meta"><a class="post-author" href="../../authors/artiom-sobolev/">Артём Соболев</a>
+    <time class="post-date published dt-published" datetime="2017-10-16T12:00:00+03:00" itemprop="datePublished" title="16 октября 2017">16 октября 2017</time></aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script></article>
+</div>
+    </div>
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+    
+    
+        <footer id="footer"><p>Contents © 2017         <a href="mailto:info@bayesgroup.ru">BayesGroup</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
+            
+        </footer><script src="../../assets/js/jquery.min.js"></script><script src="../../assets/js/moment-with-locales.min.js"></script><script src="../../assets/js/fancydates.js"></script><!-- fancy dates --><script>
+    moment.locale("ru");
+    fancydates(2, "DD.MM.YYYY");
+    </script><!-- end fancy dates -->
+</body>
+</html>

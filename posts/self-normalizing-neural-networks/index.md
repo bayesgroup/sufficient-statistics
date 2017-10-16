@@ -1,9 +1,11 @@
+---
 title: Self-Normalizing Neural Networks
 slug: self-normalizing-neural-networks
 date: 2017-06-18 21:01:00 UTC+03:00
 author: Артём Соболев
 link: https://arxiv.org/abs/1706.02515
 tags: mathjax, activations, batch normalization, deep learning, exploding gradients
+---
 
 # Мотивация
 У по-настоящему глубоких нейросетей очень много слоёв с нелинейностями, которые либо раздувают входные параметры, либо скукоживают их, а хотелось бы, чтобы распределение выходов не менялось – тем самым мы достигнем эффекта нормализации, что потенциально позволит нам выпилить уже батчнорм наконец (который многим не нравится, например, из-за внесения зависимости между семплами батча, см. [сюда](http://www.alexirpan.com/2017/04/26/perils-batch-norm.html))

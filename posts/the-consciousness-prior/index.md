@@ -1,9 +1,11 @@
+---
 title: The Consciousness Prior
 slug: the-consciousness-prior
 date: 2017-09-26 20:56:03 UTC+03:00
 author: Артём Соболев
 tags: mathjax, deep learning, attention
 link: https://arxiv.org/abs/1709.08568
+---
 
 Мини-заметка на 4 страницах о гипотетическом подходе к созданию RL агентов с механизмом сознания / изучению распутанных (disentangled) представлений, обильно политая баззвордом conscious (это слово в заметке встречается 41 раз! Сорок один! По десять раз на страницу, Карл!)
 

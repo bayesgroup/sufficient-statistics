@@ -1,9 +1,11 @@
+---
 title: Wasserstein Generative Adversarial Networks (basic and improved)
 slug: wasserstein-generative-adversarial-networks
 date: 2017-10-10 21:04:57 UTC+03:00
 author: Алексей Умнов
 link: https://arxiv.org/abs/1701.07875
 tags: mathjax, deep learning, generative models, adversarial networks, optimal transport
+---
 
 # Мотивация
 
@@ -44,7 +46,7 @@ $$
 Далее возникает вопрос - как это расстояние вычислять? Оказывается, есть теорема Канторовича-Рубинштейна, которая говорит, что у $W(P, Q)$ есть альтернативная форма (не надо пытаться понять интуитивно, (но если очень хочется, то смотри [сюда](https://vincentherrmann.github.io/blog/wasserstein/) – прим. А.С.)):
 
 $$
-W(P, Q) = \max_{\| f \|\_L \leqslant 1}
+W(P, Q) = \max_{\| f \|_L \leqslant 1}
     \mathbb E_{x \sim P} [f(x)] - \mathbb E_{x \sim Q} [f(x)],
 $$
 
@@ -53,7 +55,7 @@ $$
 $$
     W^\prime(P, Q) = \max_f \left(
         \mathbb E_{x \sim P} [f(x)] - \mathbb E_{x \sim Q} [f(x)] -
-        \lambda \mathbb E_{x \sim M_{P,Q}} \left[ (\| \nabla_x f(x) - 1)^2 \right] \right),
+        \lambda \mathbb E_{x \sim M_{P,Q}} \left[ (\| \nabla_x f(x)\|_2 - 1)^2 \right] \right),
 $$
 
 где $M_{P,Q}$ задается как смесь: $\hat x \sim M_{P,Q} \Leftrightarrow x \sim P$, $y \sim Q$, $\varepsilon \sim U[0, 1]$, $\hat x = \varepsilon x + (1 - \varepsilon) y$. Сэмплировать из этого распределения легко, но есть тонкий момент &mdash; в этой функции оптимизируется градиент, поэтому используемая библиотека здесь должна будет вычислять вторую производную.
@@ -63,7 +65,7 @@ $$
 $$
     \min_D \left(
         \mathbb E_{x \sim P_{fake}} [D(x)] - \mathbb E_{x \sim P_{real}} [D(x)] +
-        \lambda \mathbb E_{x \sim M_{P_{real},P_{fake}}} \left[ (\| \nabla_x D(x) - 1)^2 \right] \right);
+        \lambda \mathbb E_{x \sim M_{P_{real},P_{fake}}} \left[ (\| \nabla_x D(x)\|_2 - 1)^2 \right] \right);
 $$
 $$
     \min_G \left( - \mathbb E_{z \sim \mathcal{N}(0, I)} [D(G(x))] \right).

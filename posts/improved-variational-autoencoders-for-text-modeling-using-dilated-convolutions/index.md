@@ -1,9 +1,11 @@
+---
 title: Improved Variational Autoencoders for Text Modeling using Dilated Convolutions
 slug: improved-variational-autoencoders-for-text-modeling-using-dilated-convolutions
 date: 2017-09-30 21:10:03 UTC+03:00
 author: Артём Соболев
 link: https://arxiv.org/abs/1702.08139
 tags: mathjax, deep learning, dilated convolutions, generative models, text modeling, variational autoencoders
+---
 
 # Мотивация
 Речь пойдёт про вариационные автоэнкодеры для текста, что помогает, например, в unsupervised режиме находить хорошие фичи. Однако, если делать такой VAE по-наивному, то есть используя RNN энкодер и RNN декодер, то многие авторы рапортуют трудности обучения. На самом деле, проблема в том, что RNN уже достаточно мощная модель сама по себе и в состоянии моделировать языковую модель без дополнительной информации (в самом деле, любое распределение $p(x_1, \dots, x_N)$ представляется в виде $\prod_j p(x_j | x_1, \dots, x_{j−1})$, а рекурретные сети моделируют именно такие распределения).
