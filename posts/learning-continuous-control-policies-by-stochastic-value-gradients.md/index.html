@@ -154,6 +154,8 @@ V^{\pi_\theta}(s) = \mathbb{E}_{\varepsilon \sim \mathcal{N}(0, I)} \left[ R(a(s
 <p><img src="../../post-images/learning-continuous-control-policies-by-stochastic-value-gradients/svg-exp1.png"></p>
 <p>Далее идут сравнения предложенных методов с DPG и Actor-Critic'ом в двух средах различной сложности (плюс см. следующий график). Средний график измеряет чувствительность предложенных алгоритмов к модели среды – SVG(∞) ломается довольно сильно при ухудшении среды, а вот SVG(1) – нет. <img src="../../post-images/learning-continuous-control-policies-by-stochastic-value-gradients/svg-exp2.png"></p>
 <p>Вот ещё эксперименты, как утверждают авторы, в более сложных средах: <img src="../../post-images/learning-continuous-control-policies-by-stochastic-value-gradients/svg-exp3.png"></p>
+<h1 id="резюме">Резюме</h1>
+<p>Интересная работа по использованию достижений нейробайесовских моделей в обучении с подкреплением. Я так и не понял из статьи, откуда авторы берут производные функции награды – доступны ли они им аналитически, или они их выучивают?</p>
 <div class="footnotes">
 <hr>
 <ol>
