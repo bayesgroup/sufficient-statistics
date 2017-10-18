@@ -60,7 +60,7 @@ body {min-height: 100%; position: relative; padding-bottom: 3em}
 }
 
 .post-text img {
-    max-width: 90%;
+    max-width: 95%;
     margin: 0 auto;
 }
 
@@ -93,4 +93,9 @@ body {min-height: 100%; position: relative; padding-bottom: 3em}
 
 #logo img {
     max-height: 100%;
+}
+
+div.figure {
+    margin: 0!important;
+    padding: 0!important;
 }
