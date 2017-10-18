@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " vocab="http://ogp.me/ns" lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>Perturbative Black Box Variational Inference | Codename 'Sufficient Statistics'</title>
+<link href="../../assets/css/rst.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/poole.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/lanyon.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/code.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/custom.css" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=PT+Serif:400,400italic,700%7CPT+Sans:400">
+<link rel="canonical" href="http://bayesgroup.github.io/sufficient-statistics/posts/perturbative-black-box-variational-inference/">
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script><!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="Максим Кочуров">
+<link rel="prev" href="../learning-continuous-control-policies-by-stochastic-value-gradients/" title="Learning Continuous Control Policies by Stochastic Value Gradients" type="text/html">
+<meta property="og:site_name" content="Codename 'Sufficient Statistics'">
+<meta property="og:title" content="Perturbative Black Box Variational Inference">
+<meta property="og:url" content="http://bayesgroup.github.io/sufficient-statistics/posts/perturbative-black-box-variational-inference/">
+<meta property="og:description" content="Вводная
+Выбор метрики оптимизации сильно влияет результат. То же самое происходит в вариационном байесовском выводе, работы вроде alpha-Divergence это подтверждают. Что еще хочется от метрики, так это">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2017-10-18T13:22:27+03:00">
+<meta property="article:tag" content="mathjax">
+<meta property="article:tag" content="variational inference">
+</head>
+<body>
+    <a href="#content" class="sr-only sr-only-focusable">Перейти к главному содержимому</a>
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+            styles, `#sidebar-checkbox` for behavior. -->
+    <input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox"><!-- Toggleable sidebar --><div class="sidebar" id="sidebar">
+        <div class="sidebar-item">
+            <p>Обзоры не являются официальной позицией группы и предназначены исключительно для внутреннего использования.</p>
+        </div>
+        
+    <nav id="menu" role="navigation" class="sidebar-nav"><a class="sidebar-nav-item" href="../../authors/">Авторы</a>
+        <a class="sidebar-nav-item" href="../../archive.html">Архив</a>
+        <a class="sidebar-nav-item" href="../../categories/">Тэги</a>
+    
+    
+    </nav>
+</div>
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+          
+    <h3 id="brand" class="masthead-title">
+      <a href="../../" title="Codename 'Sufficient Statistics'" rel="home">Codename 'Sufficient Statistics'</a>
+    </h3>
+
+
+        </div>
+      </div>
+
+      <div class="container content" id="content">
+        
+<article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><div class="paper-link">
+        <a href="https://arxiv.org/abs/1709.07433">Paper</a>
+    </div>
+    <header><h1 class="post-title p-name entry-title" itemprop="headline name"><a href="." class="u-url">Perturbative Black Box Variational Inference</a></h1>
+
+        
+        <ul itemprop="keywords" class="tags">
+<li><a class="tag p-category" href="../../categories/variational-inference/" rel="tag">variational inference</a></li>
+        </ul></header><div class="e-content entry-content" itemprop="articleBody text">
+    <h1 id="вводная">Вводная</h1>
+<p>Выбор метрики оптимизации сильно влияет результат. То же самое происходит в вариационном байесовском выводе, работы вроде <a href="https://www.ece.rice.edu/~vc3/elec633/AlphaDivergence.pdf">alpha-Divergence</a> это подтверждают. Что еще хочется от метрики, так это небольшую дисперсию градиентов. Например, KL дивергенция обладает этим свойством, в то время как <span class="math inline">\(\alpha\)</span>-Divergence не всегда, зависит от альфы. В этой работе традиционный вариационный вывод рассматривается с другой точки зрения, которая помогает улучшить существующие методы. Как будет показано, всеми любимая KL дивергенция - это частный случай предложенного метода. Более того, в экспериментах показывается, что с увеличением размерности дисперсия градиентов лосса растет не так сильно.</p>
+<h1 id="vi-as-biased-importance-sampling">VI as biased importance sampling</h1>
+<p>Рассмотрим традиционную постановку байесовского вывода: <span class="math display">\[p(z|\mathcal{D}) = \frac{p(\mathcal{D}|z)p(z)}{p(\mathcal{D})}\]</span></p>
+<p>В байесовском вариационном выводе обычно ищется приближение <span class="math inline">\(p(z|\mathcal{D})\)</span> в виде параметрического распределения <span class="math inline">\(q_{\lambda}(z)\)</span> путём максимизации Evidence, а точнее нижней оценки на неё. На этой же идее основывается и эта работа.</p>
+<p>Всегда можно найти Evidence с помощью importance sampling, используя <span class="math display">\[
+p(\mathcal{D}) = \int {p(\mathcal{D}|z)p(z)dz} = \int{\frac{q_{\lambda}(z)p(\mathcal{D}|z)p(z)}{q_{\lambda}(z)}dz}
+\]</span></p>
+<p>Обозначим <span class="math inline">\(V = \log{q_{\lambda}(z)} - \log{p(z, \mathcal{D})}\)</span>, Interaction Energy в терминологии авторов. Тогда выражение выше переписывается как</p>
+<p><span class="math display">\[
+p(\mathcal{D}) = \int{q_{\lambda}(z)e^{-V(z)}dz}
+\]</span></p>
+<p>Вспомним и применим неравенство Йенсена. Если функция <span class="math inline">\(f\)</span> будет выпуклой и для <span class="math inline">\(\forall x&gt;0 \Rightarrow f(x)\le x\)</span> <span class="math display">\[p(\mathcal{D}) \ge f(p(\mathcal{D})) \ge \mathbb{E}_{q_{\lambda}(z)}f(e^{-V(z)})=\mathcal{L}_f(\lambda)\]</span></p>
+<ul>
+<li>Если <span class="math inline">\(f(e^{-V})=\log(e^{-V})\)</span>, то мы получим стандартную нижнюю оценку через <span class="math inline">\(KL\)</span>
+</li>
+<li>Eсли <span class="math inline">\(f(e^{-V}) = e^{-(1-\alpha)V}\)</span>, то получим вывод через <a href="https://www.ece.rice.edu/~vc3/elec633/AlphaDivergence.pdf">alpha-Divergence</a>
+</li>
+</ul>
+<p>Идея авторов – разложить <span class="math inline">\(e^{-V}\)</span> в ряд тейлора вокруг некоторой <span class="math inline">\(-V_0\)</span> <span class="math display">\[f_{V0}(e^{-V}) = e^{-V_0}(1+(V_0-V)+\frac{1}{2}(V_0-V)^2+\frac{1}{6}(V_0-V)^3 + \dots)\]</span></p>
+<p>Конечный ряд с нечетным количеством членов будет давать нижнюю оценку, т.к. функция обладает необходимыми свойствами.</p>
+<p>Вся соль в <span class="math inline">\(V_0\)</span>, который появляется в этой записи – непонятно, откуда его брать. Предлагается считать его вспомогательной величиной, которая тоже настраивается в процессе обучения.</p>
+Еще одна сложность появляется в градиентах. Если оставлять <span class="math inline">\(e^{-V_0}\)</span>, то это может привести к проблемам стабильности вычислений, заранее не ясно, какой должна быть <span class="math inline">\(V_0\)</span> и, более того, это обучаемый параметр. Поэтому предлагается использовать оценку <span class="math inline">\(\tilde{\mathcal{L}}=e^{V_0}\mathcal{L}\)</span>, и тогда <span class="math inline">\(e^{-V_0}\)</span> сократится. С градиентами происходит следующее:
+<span class="math display">\[\begin{align}
+\frac{\partial\mathcal{L}}{\partial \lambda} \propto &amp; \frac{\partial\tilde{\mathcal{L}}}{\partial \lambda} \\
+\frac{\partial\mathcal{L}}{\partial V_0} \propto &amp; \frac{\partial\tilde{\mathcal{L}}}{\partial V_0} - \tilde{\mathcal{L}}
+\end{align}\]</span>
+<p>Если учесть преобразования градиентов, то получится избежать проблемы с численной стабильностью.</p>
+<h1 id="эксперименты">Эксперименты</h1>
+<p>Экперименты многообещающие. Авторы уменьшили дисперсию лосса для моделей с большим числом параметров, а, значит, и дисперсию стохастических градиентов. <img src="../../post-images/perturbative-black-box-variational-inference/exp1.png"></p>
+<h2 id="график-3">График 3</h2>
+<p>Использовался гауссовский процесс для аппроксимации зашумленной синусоиды. Для каждого N случайно генерировались N точек, для которых имелись наблюдения, и N точек без наблюдений. Последние определяли количество скрытых переменных по мнению авторов. Затем они делали вывод на латентные переменные используя <span class="math inline">\(\alpha\)</span>-Divergence и PBVI. Этим они хотели показать, что дисперсия градиентов в их методе менее зависит от числа скрытых переменных, чем в <span class="math inline">\(\alpha\)</span>-Divergence. Отсутствие в сравнении KLVI намекает, что сравнивать там нечего или KL лучше в плане дисперсии. Авторы это не прокомментировали в статье.</p>
+<div class="figure">
+<img src="../../post-images/perturbative-black-box-variational-inference/exp2.png">
+</div>
+<h2 id="график-6">График 6</h2>
+<p>Наконец-то сравнение с KLVI! Здесь явно видно, когда от их метода есть толк. При недостаточном количестве данных действительно имеет смысл использовать более точную оценку на Evidence. Однако, при большом количестве данных авторы замечают, что их метод эквивалентен KLVI. Однако про дисперсию градиентов и скорость сходимости ни слова (скорее всего должна быть сопоставимой). И да, на VAE довольно сомнительно сравнивать, так как скорее всего использовался попиксельный лосс, который не соответствует задаче. Было бы куда интереснее посмотреть, как получается решать задачу классификации на CIFAR10.</p>
+<p>Более того, им приходится вводить дополнительную штуку как <strong>inference network на <span class="math inline">\(V_0\)</span></strong>, которая для каждого экземпляра данных ищет свой <span class="math inline">\(V_{0i}\)</span>. Это важная деталь, которая настораживает, судя по всему подбор индивидуальной <span class="math inline">\(V_{0i}\)</span> может давать результаты лучше. Вполне вероятно, без этого усложнения результат не сильно отличался от бейзлайна.</p>
+    </div>
+
+    <aside class="post-meta"><a class="post-author" href="../../authors/maksim-kochurov/">Максим Кочуров</a>
+    <time class="post-date published dt-published" datetime="2017-10-18T13:22:27+03:00" itemprop="datePublished" title="18 октября 2017">18 октября 2017</time></aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script></article>
+</div>
+    </div>
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+    
+    
+        <footer id="footer"><p>Contents © 2017         <a href="mailto:info@bayesgroup.ru">BayesGroup</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
+            
+        </footer><script src="../../assets/js/jquery.min.js"></script><script src="../../assets/js/moment-with-locales.min.js"></script><script src="../../assets/js/fancydates.js"></script><!-- fancy dates --><script>
+    moment.locale("ru");
+    fancydates(2, "DD.MM.YYYY");
+    </script><!-- end fancy dates -->
+</body>
+</html>
