@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " vocab="http://ogp.me/ns" lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>Deep Exponential Families | Codename 'Sufficient Statistics'</title>
+<link href="../../assets/css/rst.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/poole.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/lanyon.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/code.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/custom.css" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=PT+Serif:400,400italic,700%7CPT+Sans:400">
+<link rel="canonical" href="http://bayesgroup.github.io/sufficient-statistics/posts/deep-exponential-families/">
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script><!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="Артём Гадецкий">
+<link rel="prev" href="../perturbative-black-box-variational-inference/" title="Perturbative Black Box Variational Inference" type="text/html">
+<meta property="og:site_name" content="Codename 'Sufficient Statistics'">
+<meta property="og:title" content="Deep Exponential Families">
+<meta property="og:url" content="http://bayesgroup.github.io/sufficient-statistics/posts/deep-exponential-families/">
+<meta property="og:description" content="Вводная
+В данной статье рассматривается класс моделей со скрытыми переменными под названием Deep Exponential Family (DEF), который представляет из себя генеративную модель данных. Иерархическая структ">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2017-10-22T21:13:58+03:00">
+<meta property="article:tag" content="deep learning">
+<meta property="article:tag" content="generative models">
+<meta property="article:tag" content="mathjax">
+<meta property="article:tag" content="probabilistic modeling">
+</head>
+<body>
+    <a href="#content" class="sr-only sr-only-focusable">Перейти к главному содержимому</a>
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+            styles, `#sidebar-checkbox` for behavior. -->
+    <input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox"><!-- Toggleable sidebar --><div class="sidebar" id="sidebar">
+        <div class="sidebar-item">
+            <p>Обзоры не являются официальной позицией группы и предназначены исключительно для внутреннего использования.</p>
+        </div>
+        
+    <nav id="menu" role="navigation" class="sidebar-nav"><a class="sidebar-nav-item" href="../../authors/">Авторы</a>
+        <a class="sidebar-nav-item" href="../../archive.html">Архив</a>
+        <a class="sidebar-nav-item" href="../../categories/">Тэги</a>
+    
+    
+    </nav>
+</div>
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+          
+    <h3 id="brand" class="masthead-title">
+      <a href="../../" title="Codename 'Sufficient Statistics'" rel="home">Codename 'Sufficient Statistics'</a>
+    </h3>
+
+
+        </div>
+      </div>
+
+      <div class="container content" id="content">
+        
+<article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><div class="paper-link">
+        <a href="https://arxiv.org/abs/1411.2581">Paper</a>
+    </div>
+    <header><h1 class="post-title p-name entry-title" itemprop="headline name"><a href="." class="u-url">Deep Exponential Families</a></h1>
+
+        
+        <ul itemprop="keywords" class="tags">
+<li><a class="tag p-category" href="../../categories/deep-learning/" rel="tag">deep learning</a></li>
+            <li><a class="tag p-category" href="../../categories/generative-models/" rel="tag">generative models</a></li>
+            <li><a class="tag p-category" href="../../categories/probabilistic-modeling/" rel="tag">probabilistic modeling</a></li>
+        </ul></header><div class="e-content entry-content" itemprop="articleBody text">
+    <h1 id="вводная">Вводная</h1>
+<p>В данной статье рассматривается класс моделей со скрытыми переменными под названием Deep Exponential Family (DEF), который представляет из себя генеративную модель данных. Иерархическая структура данной модели очень похожа на всем известные глубинные нейронные сети (правда здесь глубины не добрали, конечно). В общем и целом авторы статьи переложили обычные полносвязные нейронные сети на вероятностный язык и посмотрели, что из этого вышло. Далее следует описание модели, примеры DEF и проведенные эксперименты.</p>
+<h1 id="экспоненциальное-семейство-распределений">Экспоненциальное семейство распределений</h1>
+<p>Распределение <span class="math inline">\(p(x)\)</span> принадлежит экспоненциальному семейству распределений, если возможно представить плотность <span class="math inline">\(p(x)\)</span> в виде:</p>
+<p><span class="math display">\[p(x) = h(x) \exp(\eta^T T(x) - a(\eta))\]</span> где <span class="math inline">\(\eta\)</span> - т.н. натуральные параметры, <span class="math inline">\(T\)</span> - достаточные статистики, <span class="math inline">\(a(\eta)\)</span> - логарифм нормировочной константы. Также можно показать, что</p>
+<p><span class="math display">\[\mathbb{E} [T(x)] = \nabla_{\eta} a(\eta)\]</span></p>
+<p>Можно видеть, что любое распределение из экспоненциального семейства полностью задается с помощью соответствующих h(x) и T(x). Далее принадлежность распределения к эспоненциальному семейству будем обозначать следующим образом:</p>
+<p><span class="math display">\[p(x) = \text{ExpFam}(x, \eta)\]</span></p>
+<h1 id="deep-exponential-family">Deep Exponential Family</h1>
+<p>Пусть <span class="math inline">\(X = \{x_1, \dots, x_N\}\)</span> - выборка, <span class="math inline">\(x_n\)</span> имеет размерность <span class="math inline">\(V\)</span>. Для каждого <span class="math inline">\(x_n\)</span> имеется <span class="math inline">\(L\)</span> слоев скрытых переменных <span class="math inline">\(\{ z_{n, 1}, \dots, z_{n, L} \}\)</span>, где <span class="math inline">\(z_{n, l} = \{z_{n, l, 1}, \dots, z_{n, l, K_l}\}\)</span>. Также в модели имеется <span class="math inline">\(L-1\)</span> слоев весов <span class="math inline">\(\{W_{1}, \dots, W_{L-1}\}\)</span>, где каждый <span class="math inline">\(W_l = \{W_{l, 1}, \dots, W_{l, K_l}\}\)</span> и <span class="math inline">\(W_{l, k}\)</span> имеет размерность <span class="math inline">\(K_{l+1}\)</span>. Кроме того, задается априорное распределение на веса - <span class="math inline">\(p(W_l)\)</span>. Правдоподобие <span class="math inline">\(p(x_{n, i} | z_{n, 1}, w_{0, i})\)</span>, как обычно, задается исходя из постановки задачи. <span class="math inline">\(W_0 = \{w_{0, 1}, \dots, w_{0, V}\}\)</span> - веса, связывающие первый скрытый слой с наблюдениями (в правдоподобии).</p>
+<p><img src="../../post-images/deep-exponential-families/DEF.png" class="small"></p>
+<p>Введем нужные распределения:</p>
+<span class="math display">\[\begin{align}
+&amp; p(z_{n, L, k}) = \text{ExpFam}_{L}(z_{n, L, k}, \eta) \\
+&amp; p(z_{n, l, k} | z_{n, l+1}, w_{l, k}) = \text{ExpFam}_{l}(z_{n, l, k}, g_l(z_{n, l+1}^T w_{l, k}))
+\end{align}\]</span>
+<p>где <span class="math inline">\(g_l\)</span> - фукнция, трансформирующая линейное преобразование в натуральные параметры распределения. Авторы называют эту функцию link function, по аналогии с обобщенными линейными моделями, где link function отвечает за связь математического ожидания распределения и линейного предсказания. Если проводить параллель с нейронными сетями, то эта функция <span class="math inline">\(g\)</span> привносит нелинейность в модель по аналогии с нелинейной функцией активации в нейронных сетях.</p>
+<p>Таким образом имеем следующую совместную вероятностную модель:</p>
+<p><span class="math display">\[p(X, Z, W | \eta) = \prod_{n=1}^{N} \Bigg[ \Big( \prod_{i=1}^{V} p(x_{n, i} | z_{n, 1}, w_{0, i}) p(w_{0, i}) \Big) \Big( \prod_{l=1}^{L-1} \prod_{k=1}^{K_l} p(z_{n, l, k} | z_{n, l+1}, w_{l, k}) p(w_{l, k}) \Big) \prod_{k=1}^{K_L} p(z_{n, L, k} | \eta) \Bigg]\]</span></p>
+<h1 id="примеры-def-в-задаче-моделирования-текста">Примеры DEF в задаче моделирования текста</h1>
+<p>Есть словарь размера <span class="math inline">\(V\)</span>. Тогда <span class="math inline">\(x_{n, i}\)</span> - сколько раз слово <span class="math inline">\(i\)</span> встретилось в тексте <span class="math inline">\(n\)</span>. Правдоподобие задается следующим образом:</p>
+<p><span class="math display">\[p(x_{n, i} | z_{n, 1}, w_{0, i}) = \text{Poisson}(x_{n, i} | g(z_{n, 1}^T w_{0, i}))\]</span></p>
+<p>Элементы <span class="math inline">\(W_{0}\)</span> должны быть положительными, поэтому в качестве априорного распределения на <span class="math inline">\(W_0\)</span> берется полностью факторизованное Гамма распределение.</p>
+<p><img src="../../post-images/deep-exponential-families/examples.png"></p>
+<p>где Z-Dist - распределение скрытых переменных, W-Dist - априорное распределение на веса слоев, <span class="math inline">\(g_l\)</span> - link function в слоях.</p>
+<h1 id="inference">Inference</h1>
+<p>Для получения апостериорного распределения p(Z, W | X) авторы используют вариационный вывод, а именно изобретенный раннее Black Box Variational Inference (<a href="http://artem.sobolev.name/posts/2016-07-05-neural-variational-inference-blackbox.html">обзор от Артёма Соболева</a> <a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a>).</p>
+<p><span class="math display">\[\mathcal{L}(q) = \mathbb{E}_{q(Z, W)} [\log p(X, Z, W) - \log q(Z, W)] \rightarrow \max\limits_{\phi}\]</span></p>
+<p>где <span class="math inline">\(q(Z, W) = q(W_0) \big( \prod_{l=1}^{L-1} q(W_{l}) \prod_{n=1}^{N} q(z_{n, l}) \big) \prod_{n=1}^{N} q(z_{n, L})\)</span> - вариационное приближение апостериорного распределения (см. Mean Field). <span class="math inline">\(q(z_{n, l})\)</span> и <span class="math inline">\(q(W_{l})\)</span> так же полностью факторизуются.</p>
+<p><span class="math display">\[q(z_{n, l, k}) = \text{ExpFam}_{l}(z_{n, l, k}, \lambda_{n, l, k})\]</span></p>
+<p>причем <span class="math inline">\(q(z_{n, l, k})\)</span> выбирается из того же семейства, что и распределение на <span class="math inline">\(z_{n, l, k}\)</span> в <span class="math inline">\(p(X, Z, W)\)</span>. Аналогично, в качестве вариационного приближения на веса <span class="math inline">\(q(W | \xi)\)</span> берем распределение из того же семейства, что и <span class="math inline">\(p(W)\)</span>. Тогда <span class="math inline">\(\phi = \{\lambda, \xi \}\)</span> - все вариационные параметры, по ним и ведется оптимизация с помощью Black Box Variational Inference (BBVI).</p>
+<h1 id="эксперименты">Эксперименты</h1>
+<h2 id="моделирование-текста">Моделирование текста</h2>
+<p>Эксперименты проводились на корпусах текстов New York Times и Science. В качестве бейзлайнов рассматривалась модель LDA и DocNade(вроде state-of-the-art на 2013 год, но это неточно). В качестве метрики качества, как это обычно делается в моделировании текстов, рассматривалась perplexity - (экспонента от логарифма правдоподобия, усредненного по общему количеству слов) на отложенной выборке. В качестве DEF моделей взяли описанные выше. Перебирали различные прайоры на веса, количество слоев и link function. Размеры слоев зафиксировали: 100, 30, 15. Получили следующие результаты:</p>
+<p><img src="../../post-images/deep-exponential-families/exp1.png" class="medium"></p>
+<h3 id="выводы">Выводы</h3>
+<ol style="list-style-type: decimal">
+<li>DEFы обошли бейзлайны.</li>
+<li>Больше слоев - лучше (как в глубинных нейронных сетях, но не настолько глубинно).</li>
+<li>Bernoulli DEF сложно обучать, для них при увеличении количества слоев perplexity растет, видимо в градиентах уж очень много шума.</li>
+</ol>
+<h2 id="факторизация-матриц-и-double-def">Факторизация матриц и Double DEF</h2>
+<p>В качестве датасета взяли Arxiv click data (матрица пользователи-документы, элемент матрицы - количество кликов) и Netflix movie ratings (матрица пользователи-фильмы, элемент матрицы - рейтинг). Поменяли правдоподобие и саму модель немного, теперь:</p>
+<span class="math display">\[\begin{align}
+&amp; p(x_{n, i} | z_{n, 1}^c, z_{i, 1}^r) = \text{Poisson}(x_{n, i} | z_{n, 1}^{cT} z_{i, 1}^r) \\
+&amp; z_{n, 1}^c - \text{скрытое представление пользователя}\\
+&amp; z_{i, 1}^r - \text{скрытое представление документа/фильма}\\
+\end{align}\]</span>
+<p>И добавляется еще "иерархия" (DEF) на <span class="math inline">\(z_{n, 1}^c\)</span> и <span class="math inline">\(z_{i, 1}^r\)</span>. Если посмотреть на графическую модель, то она будет отличаться от приведенной в самом начале тем, что теперь у нас вместо <span class="math inline">\(W_{0}\)</span> есть DEF, аналогичное ветвление слоев как это происходит от <span class="math inline">\(z_{n, 1}\)</span>. Такая модель называется Double DEF. В качестве метрик взяли perplexity и NDCG (метрика ранжирования, больше лучше). Перебирали количество слоев, получили аналогичный вывод: чем больше слоев, тем лучше (почти), бейзлайн также был побит.</p>
+<p><img src="../../post-images/deep-exponential-families/exp2.png"></p>
+<h1 id="итог">Итог</h1>
+<p>Авторы предложили новую генеративную вероятностную модель, которая имеет иерархическую структуру. Воспользовались раннее придуманным методом вывода и даже побили какие-то методы, что показали в экспериментах. Есть код на C++, видимо чтобы училось быстро, сами пишут, что может появится эта модель и в Edward'е, библиотеку для вероятностного моделирования, которую они разрабатывают.</p>
+<div class="footnotes">
+<hr>
+<ol>
+<li id="fn1"><p>Примечание от Артёма Соболева: BBVI – не самый лучший способ делать вывод в стохастических вычислительных графах, современной науке известна масса методов лучше. См. мою серию про <a href="http://artem.sobolev.name/tags/stochastic%20computation%20graphs%20series.html">backprop в стохастических вычислительных графах</a> (work in progress).<a href="#fnref1">↩</a></p></li>
+</ol>
+</div>
+    </div>
+
+    <aside class="post-meta"><a class="post-author" href="../../authors/artiom-gadetskii/">Артём Гадецкий</a>
+    <time class="post-date published dt-published" datetime="2017-10-22T21:13:58+03:00" itemprop="datePublished" title="22 октября 2017">22 октября 2017</time></aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script></article>
+</div>
+    </div>
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+    
+    
+        <footer id="footer"><p>Contents © 2017         <a href="mailto:info@bayesgroup.ru">BayesGroup</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
+            
+        </footer><script src="../../assets/js/jquery.min.js"></script><script src="../../assets/js/moment-with-locales.min.js"></script><script src="../../assets/js/fancydates.js"></script><!-- fancy dates --><script>
+    moment.locale("ru");
+    fancydates(2, "DD.MM.YYYY");
+    </script><!-- end fancy dates -->
+</body>
+</html>
