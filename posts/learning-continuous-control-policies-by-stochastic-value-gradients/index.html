@@ -148,7 +148,9 @@ V^{\pi_\theta}(s) = \mathbb{E}_{\varepsilon \sim \mathcal{N}(0, I)} \left[ R(a(s
 <h2 id="svg0">SVG(0)</h2>
 <p>Пока мы обсуждали только model-based подход, считая, что модель достаточно просто выучить (в сравнении со сложность изучения <span class="math inline">\(Q\)</span>-функции). Если это не так, то можно выучить <span class="math inline">\(Q\)</span>-функцию и делать model-free подход. Для этого предлагается следующий алгоритм (я уверен, авторы забыли IS коэффициент).</p>
 <p><img src="../../post-images/learning-continuous-control-policies-by-stochastic-value-gradients/svg-0-alg.png" class="medium"></p>
-<p>Обоснование этому примерно такое, что \[ J() = <em>{s_0} </em>{_(a|s_0)} Q(a, s_0) \]</p>
+<p>Обоснование этому примерно такое, что <span class="math display">\[
+J(\theta) = \mathbb{E}_{s_0} \mathbb{E}_{\pi_\theta(a|s_0)} Q(a, s_0)
+\]</span></p>
 <p>Это получается такой забавный Q-learning, где мы пользуется не ε-жадной политикой, а какой-то выученной.</p>
 <h1 id="эксперименты">Эксперименты</h1>
 <p>Сначала авторы показывают, как важно то, что они сумели обсуловиться на реальные траектории – иначе ошибка слишком сильно накапливается. Потом они сравниваются с Deterministic Policy Gradients.</p>

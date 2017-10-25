@@ -110,9 +110,9 @@ $$
 <img src="/post-images/learning-continuous-control-policies-by-stochastic-value-gradients/svg-0-alg.png" class="medium" />
 
 Обоснование этому примерно такое, что
-\\[
+$$
 J(\theta) = \mathbb{E}_{s_0} \mathbb{E}_{\pi_\theta(a|s_0)} Q(a, s_0)
-\\]
+$$
 
 Это получается такой забавный Q-learning, где мы пользуется не ε-жадной политикой, а какой-то выученной.
 
