@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " vocab="http://ogp.me/ns" lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>Debiasing Evidence Approximations: on Importance-Weighted Autoencoders and Jackknife Variational Inference | Codename 'Sufficient Statistics'</title>
+<link href="../../assets/css/rst.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/poole.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/lanyon.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/code.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/custom.css" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=PT+Serif:400,400italic,700%7CPT+Sans:400">
+<link rel="canonical" href="http://bayesgroup.github.io/sufficient-statistics/posts/debiasing-evidence-approximations-on-importance-weighted-autoencoders-and-jackknife-variational-inference/">
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script><!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="Максим Кочуров">
+<link rel="prev" href="../discrete-valued-neural-networks-using-variational-inference/" title="Discrete-Valued Neural Networks Using Variational Inference" type="text/html">
+<link rel="next" href="../adaptive-memory-networks/" title="Adaptive Memory Networks" type="text/html">
+<meta property="og:site_name" content="Codename 'Sufficient Statistics'">
+<meta property="og:title" content="Debiasing Evidence Approximations: on Importance-Weighted Autoencoders">
+<meta property="og:url" content="http://bayesgroup.github.io/sufficient-statistics/posts/debiasing-evidence-approximations-on-importance-weighted-autoencoders-and-jackknife-variational-inference/">
+<meta property="og:description" content='Введение
+Авторы статьи развивают идеи "IWAE" Burda et al. (2015) в своей работе. Основной их вклад в том, что они уменьшают смещение без сильного увеличения вычислительных затрат. Рассмотрим для начал'>
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2017-11-06T03:58:03+03:00">
+<meta property="article:tag" content="mathjax">
+<meta property="article:tag" content="variational inference">
+</head>
+<body>
+    <a href="#content" class="sr-only sr-only-focusable">Перейти к главному содержимому</a>
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+            styles, `#sidebar-checkbox` for behavior. -->
+    <input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox"><!-- Toggleable sidebar --><div class="sidebar" id="sidebar">
+        <div class="sidebar-item">
+            <p>Обзоры не являются официальной позицией группы и предназначены исключительно для внутреннего использования.</p>
+        </div>
+        
+    <nav id="menu" role="navigation" class="sidebar-nav"><a class="sidebar-nav-item" href="../../authors/">Авторы</a>
+        <a class="sidebar-nav-item" href="../../archive.html">Архив</a>
+        <a class="sidebar-nav-item" href="../../categories/">Тэги</a>
+    
+    
+    </nav>
+</div>
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+          
+    <h3 id="brand" class="masthead-title">
+      <a href="../../" title="Codename 'Sufficient Statistics'" rel="home">Codename 'Sufficient Statistics'</a>
+    </h3>
+
+
+        </div>
+      </div>
+
+      <div class="container content" id="content">
+        
+<article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><div class="paper-link">
+        <a href="https://openreview.net/forum?id=HyZoi-WRb&amp;noteId=HyZoi-WRb">Paper</a>
+    </div>
+    <header><h1 class="post-title p-name entry-title" itemprop="headline name"><a href="." class="u-url">Debiasing Evidence Approximations: on Importance-Weighted Autoencoders and Jackknife Variational Inference</a></h1>
+
+        
+        <ul itemprop="keywords" class="tags">
+<li><a class="tag p-category" href="../../categories/variational-inference/" rel="tag">variational inference</a></li>
+        </ul></header><div class="e-content entry-content" itemprop="articleBody text">
+    <h1 id="введение">Введение</h1>
+<p>Авторы статьи развивают идеи "IWAE" <a href="https://arxiv.org/abs/1509.00519">Burda et al. (2015)</a> в своей работе. Основной их вклад в том, что они уменьшают смещение без сильного увеличения вычислительных затрат. Рассмотрим для начала идею IWAE для того, чтобы перейти дальше к рассмотрению предложенной авторами нижней оценки.</p>
+<h1 id="обзор-известных-техник">Обзор известных техник</h1>
+<p>Вариационный вывод можно свести к максимизации Evidence, <span class="math inline">\(p(X)\)</span> представима через importance sampling</p>
+<p><span class="math display">\[
+\begin{align}
+p(X) &amp; = \int p(X|z)p(z)dz\\
+     &amp; = \int q(z)\frac{p(X|z)p(z)}{q(z)}dz\\
+\end{align}
+\]</span></p>
+<p>Применив здесь логарифм и неравенство Йенсена получим</p>
+<p><span class="math display">\[
+\log p(X) = \log \left( 
+        \int q(z)\frac{p(X|z)p(z)}{q(z)}dz 
+    \right)
+          \ge \int q(z|X)\log \frac{p(X|z)p(z)}{q(z|X)}dz
+          = \mathcal{L}_E
+ \]</span></p>
+<p>На практике <span class="math inline">\(\mathcal{L}_E\)</span> оценивается несколькими сэмплами <span class="math inline">\(z_k \sim q(z|X)\)</span></p>
+<p><span class="math display">\[
+ \hat{\mathcal{L}}_E = \frac{1}{K}\sum_{k=1}^{K}\log \frac{p(X|z_k)p(z_k)}{q(z_k|X)}
+ \]</span></p>
+<p>Что предложили <a href="https://arxiv.org/abs/1509.00519">Burda et al. (2015)</a>: изменить оценку, немного убрав смещение <span class="math display">\[
+\log p(X) \ge \mathbb{E}_{z_1 \dots z_k \sim q(z|X)}
+    \left[ 
+        \log \frac{1}{K}\sum_{k=1}^{K}\frac{p(X|z_k)p(z_k)}{q(z_k|X)}
+    \right] = \mathcal{L}_K
+\]</span></p>
+<p>Все, что изменилось, это порядок, сначала берется эмпирическая оценка <span class="math inline">\(p(X)\)</span> и только потом применяется неравенство Йенсена. При этом показано, что</p>
+<p><span class="math display">\[
+\mathcal{L}_E = \mathcal{L}_1 \le \mathcal{L}_2 \le \mathcal{L}_3 \le \dots \le \mathcal{L}_{\infty} = p(X)
+\]</span></p>
+<p>Далее авторы показывают, что смещение такой оценки имеет порядок <span class="math inline">\(O(1/K)\)</span> с коэффициентом <span class="math inline">\(\mu_2 / \mu^2\)</span>. При <span class="math inline">\(K=1\)</span>, стандартный случай, эта величина довольно существенна. Дисперсия при этом имеет такой же порядок с коэф. <span class="math inline">\(\mu_2^2 / \mu^2\)</span>. Получается, что такая оценка только асимптотически хорошая: состоятельная и несмещенная. На практике, получить несмещенную (без асимтотик) оценку можно зная первые и вторые моменты. К сожалению моменты не известны, оценка смещенная.</p>
+<h1 id="jackknife">Jackknife</h1>
+<p>Подход, который предложили авторы известен достаточно давно, но к варвыводу его никто не применял. Идея состоит в следующем. Почти любая эмпирическая оценка представима в виде</p>
+<p><span class="math display">\[
+\mathbb{E}\left[\hat{T}_n\right] = T + \frac{q_1}{n} + \frac{q_2}{n^2} + \frac{q_3}{n^3} + \dots
+\]</span></p>
+<p>Теперь посчитаем оценки для <span class="math inline">\(n\)</span> и <span class="math inline">\(n-1\)</span> , домножим на <span class="math inline">\(n\)</span> и <span class="math inline">\(n-1\)</span>, вычтем друг из друга, то получим следующее упрощение</p>
+<p><span class="math display">\[
+\mathbb{E}
+    \left[
+        n\hat{T}_n - (n-1)\hat{T}_{n-1}
+    \right] = T + O(n^{-2})
+\]</span></p>
+<p>Данное упрощение справедливо при если оценка представима в виде формы выше. Наша таковой является, поэтому метод применим.</p>
+<p>Для получения оценок <span class="math inline">\(\hat{T}_n\)</span> и <span class="math inline">\(\hat{T}_{n-1}\)</span> можно использовать выборку размера <span class="math inline">\(n\)</span>. Для <span class="math inline">\(\hat{T}_n\)</span> используем все сэмплы, для <span class="math inline">\(\hat{T}_{n-1}\)</span> считаем на <span class="math inline">\(n\)</span> подмножествах размера <span class="math inline">\(n-1\)</span> и усредняем.</p>
+<h2 id="generalized-jackknife">Generalized Jackknife</h2>
+<p>После того, как трюк Jackknife применен один раз, все условия для последующего применения теоремы сохраняются и его можно использовать еще раз. Этот прием придумали еще в далеком 1971 (Schucany et al.) и даже посчитали необходимые коэффициенты суммирования каждой из оценок. Выглядит это так</p>
+<p><span class="math display">\[
+\begin{align}
+\hat{T}_G^{(m)} &amp;= \sum_{j=0}^m c(n, m, j) \hat{T}_{n-j} \\
+    c(n, m, j)  &amp;= (-1)^j\frac{(n-j)^m}{(m-j)!j!}
+\end{align}
+\]</span></p>
+<p>Такая оценка уже дает смещение порядка <span class="math inline">\(O(m^{-(j+1)})\)</span> (мне кажется, что авторы опечатались и должно быть <span class="math inline">\(O(n^{-(m+1)})\)</span>) что впечатляет. Тем не менее, приходится платить дисперсией</p>
+<p><span class="math display">\[
+\mathbb{V}[\hat{T}_G^{(m+1)}] \gt \mathbb{V}[\hat{T}_G^{(m)}]
+\]</span></p>
+<h1 id="jackknife-variational-inference">Jackknife Variational Inference</h1>
+<p>Теперь о том, как это используется в вариационке. Требуется только заменить <span class="math inline">\(\hat{T}\)</span> на <span class="math inline">\(ELBO_K\)</span>. <span class="math display">\[
+\begin{align}
+\hat{\mathcal{L}}_K^{J,m} &amp;= \sum_{j=0}^m c(K, m, j) \bar{\mathcal{L}}_{K-j} \\
+\bar{\mathcal{L}}_{K-j}   &amp;= \frac{1}{
+    C_K^{K-j}
+}\sum_{i=1}^{C_K^{K-j}}\hat{\mathcal{L}}_{K-j}(Z_i^{(K-j)})
+\end{align}
+\]</span> В обобщенной оценке по Jackknife используются оценки <span class="math inline">\(ELBO\)</span> по выборкам разного размера. Чтобы избежать повторного дорогого сэмплирования, используются оценки усредненные по всем возможным подмножествам заданного размера. Вычислительная сложность от этого вырастает не сильно, так как вычислительный граф может переиспользовать <span class="math inline">\(w_i=\frac{p(X|z_k)p(z_k)}{q(z_k|X)}\)</span>.</p>
+<h1 id="эксперименты">Эксперименты</h1>
+<h2 id="bias">Bias</h2>
+<p>Авторы показали качественное улучшение стохастических оценок по сравнению с ранними работами.</p>
+<p><img src="../../post-images/debiasing-evidence-approximations-on-importance-weighted-autoencoders-and-jackknife-variational-inference/figure3.png"></p>
+<p>Вычислительная сложность предложенного подхода зависит преимущественно от <span class="math inline">\(K\)</span>, как и ожидалось</p>
+<p><img src="../../post-images/debiasing-evidence-approximations-on-importance-weighted-autoencoders-and-jackknife-variational-inference/figure2.png"></p>
+<h2 id="mnist">MNIST</h2>
+<p>Конечно, их подход убирает смещение, и всем хорош. Они показали себя горазло лучше, чем стандартная стохастическая оценка на ELBO. Что интересно, у них получилось не сильно лучше обучить автоэнкодер, чем <a href="https://arxiv.org/abs/1509.00519">Burda et al. (2015)</a>.</p>
+<p><img src="../../post-images/debiasing-evidence-approximations-on-importance-weighted-autoencoders-and-jackknife-variational-inference/table1.png"></p>
+    </div>
+
+    <aside class="post-meta"><a class="post-author" href="../../authors/maksim-kochurov/">Максим Кочуров</a>
+    <time class="post-date published dt-published" datetime="2017-11-06T03:58:03+03:00" itemprop="datePublished" title="06 ноября 2017">06 ноября 2017</time></aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script></article>
+</div>
+    </div>
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+    
+    
+        <footer id="footer"><p>Contents © 2017         <a href="mailto:info@bayesgroup.ru">BayesGroup</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
+            
+        </footer><script src="../../assets/js/jquery.min.js"></script><script src="../../assets/js/moment-with-locales.min.js"></script><script src="../../assets/js/fancydates.js"></script><!-- fancy dates --><script>
+    moment.locale("ru");
+    fancydates(2, "DD.MM.YYYY");
+    </script><!-- end fancy dates -->
+</body>
+</html>

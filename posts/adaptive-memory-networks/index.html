@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " vocab="http://ogp.me/ns" lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>Adaptive Memory Networks | Codename 'Sufficient Statistics'</title>
+<link href="../../assets/css/rst.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/poole.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/lanyon.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/code.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/custom.css" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=PT+Serif:400,400italic,700%7CPT+Sans:400">
+<link rel="canonical" href="http://bayesgroup.github.io/sufficient-statistics/posts/adaptive-memory-networks/">
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script><!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="Надежда Чиркова">
+<link rel="prev" href="../debiasing-evidence-approximations-on-importance-weighted-autoencoders-and-jackknife-variational-inference/" title="Debiasing Evidence Approximations: on Importance-Weighted Autoencoders and Jackknife Variational Inference" type="text/html">
+<meta property="og:site_name" content="Codename 'Sufficient Statistics'">
+<meta property="og:title" content="Adaptive Memory Networks">
+<meta property="og:url" content="http://bayesgroup.github.io/sufficient-statistics/posts/adaptive-memory-networks/">
+<meta property="og:description" content="Статья о новой архитектуре с внешней памятью, причем архитектура модуля памяти зависит от входных данных. Статья не очень хорошо написана в плане обозначений и аккуратности в написании формул, поэтому">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2017-11-07T02:50:38+03:00">
+<meta property="article:tag" content="deep learning">
+<meta property="article:tag" content="mathjax">
+<meta property="article:tag" content="memory">
+</head>
+<body>
+    <a href="#content" class="sr-only sr-only-focusable">Перейти к главному содержимому</a>
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+            styles, `#sidebar-checkbox` for behavior. -->
+    <input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox"><!-- Toggleable sidebar --><div class="sidebar" id="sidebar">
+        <div class="sidebar-item">
+            <p>Обзоры не являются официальной позицией группы и предназначены исключительно для внутреннего использования.</p>
+        </div>
+        
+    <nav id="menu" role="navigation" class="sidebar-nav"><a class="sidebar-nav-item" href="../../authors/">Авторы</a>
+        <a class="sidebar-nav-item" href="../../archive.html">Архив</a>
+        <a class="sidebar-nav-item" href="../../categories/">Тэги</a>
+    
+    
+    </nav>
+</div>
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+          
+    <h3 id="brand" class="masthead-title">
+      <a href="../../" title="Codename 'Sufficient Statistics'" rel="home">Codename 'Sufficient Statistics'</a>
+    </h3>
+
+
+        </div>
+      </div>
+
+      <div class="container content" id="content">
+        
+<article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><div class="paper-link">
+        <a href="https://openreview.net/forum?id=SJZ2Mf-0-&amp;noteId=SJZ2Mf-0-">Paper</a>
+    </div>
+    <header><h1 class="post-title p-name entry-title" itemprop="headline name"><a href="." class="u-url">Adaptive Memory Networks</a></h1>
+
+        
+        <ul itemprop="keywords" class="tags">
+<li><a class="tag p-category" href="../../categories/deep-learning/" rel="tag">deep learning</a></li>
+            <li><a class="tag p-category" href="../../categories/memory/" rel="tag">memory</a></li>
+        </ul></header><div class="e-content entry-content" itemprop="articleBody text">
+    <p>Статья о новой архитектуре с внешней памятью, причем архитектура модуля памяти зависит от входных данных. Статья не очень хорошо написана в плане обозначений и аккуратности в написании формул, поэтому понять, что имели в виду авторы, не всегда представилось возможным.</p>
+<h1 id="постановка-задачи">Постановка задачи</h1>
+<p>В статье решают задачу Question Answering. Имеется некая история (набор предложений) <span class="math inline">\(l_1, \dots, l_N\)</span> и вопрос (или несколько вопросов) <span class="math inline">\(q\)</span> по этой истории (тоже предложение), необходимо найти ответ <span class="math inline">\(a\)</span>. Часто ответом является какое-то слово, или ответ выбирается из нескольких вариантов, поэтому по сути мы решаем задачу классификации.</p>
+<p>Задача решается на уровне слов, то есть все <span class="math inline">\(l_i\)</span> и <span class="math inline">\(q\)</span> - это последовательности слов из словаря.</p>
+<h1 id="стандартный-подход-к-решению">Стандартный подход к решению</h1>
+<p>В статье <a href="https://papers.nips.cc/paper/5846-end-to-end-memory-networks.pdf">End-to-End Memory networks</a> (NIPS'15) предложили следующий алгоритм поиска ответа:</p>
+<ol style="list-style-type: decimal">
+<li>Для всех предложений истории и запроса найти скрытое представление <span class="math inline">\(m_1, \dots, m_N\)</span> и <span class="math inline">\(u\)</span> соответственно.</li>
+<li>Вычислить веса преложений: <span class="math display">\[p_i = \text{softmax}_i(u^T m_i)\]</span>
+</li>
+<li>Для всех предложений истории найти также выходные векторы <span class="math inline">\(c_1, \dots, c_N\)</span>. Найти скрытое представление ответа <span class="math display">\[o = \sum_i p_i c_i\]</span>
+</li>
+<li>Решающее правило классификации (вероятности ответов): <span class="math display">\[a = \text{softmax}(W(o+u))\]</span>
+</li>
+</ol>
+<p>Все веса обучаются end-to-end с оптимизацией кросс-энтропии.</p>
+<h1 id="основная-задумка-авторов">Основная задумка авторов</h1>
+<p>В описанном и других подходах для выдачи ответа необходимо просматривать всю память (<span class="math inline">\(m_1, \dots, m_N\)</span>) для выдачи ответа. Авторы предлагают распределять слова (в виде скрытых представлений) по нескольким упорядоченным банкам памяти: в первом хранятся наименее релевантные вопросу слова, в последнем - наиболее. Тогда на этапе поиска ответа мы сможем просматривать только несколько последних банков, и это сэкономит время.</p>
+<p>Каждое слово сначала попадает в первый банк, а потом может быть перенесено в следующие. Если в последнем банке становится слишком много слов, создается новый банк. Эти два действия требуют дискретное решение. Авторы утверждают, что они придумали аналог reparametrization trick для распределения Бернулли так, что случайность вынесена из обратного прохода в вычислительном графе. Но как они это делают, написано не особо понятно (да, именно самый интересный момент). Однако благодаря наличию этих двух действий сеть становится динамической и изменяет структуру в зависимости от входных данных.</p>
+<h1 id="архитектура">Архитектура</h1>
+<p>Вычислительный граф состоит из кодировщика (обрабатывает слова входных предложений и вопроса), адаптивного модуля памяти (распределяет слова по памяти) и декодировщика (генерирует ответ, используя банки памяти).</p>
+<h2 id="кодировщик">Кодировщик</h2>
+<p>Кодировщик для каждого слова определяет скрытое представление, а также релевантность вопросу (число от 0 до 1).</p>
+<p><em>Получение скрытых представлений для слов.</em> Пропустить предложение (по словам) через GRU с embedding-слоем. В отдельной lookup-матрице храним скрытые состояния для слов в словаре. Сначала они инициализируются нулями, и каждый раз, когда слово встречается в предложении, его скрытое состояние из GRU прибавляется к соответствующей этому слову строке lookup-матрицы.</p>
+<p>Вопрос также пропускаем через GRU, но в lookup-матрице состояний его не учитываем. Скрытым представлением вопроса <span class="math inline">\(h_q\)</span> будем считать скрытое состояние, в котором остановилась GRU при обработке вопроса.</p>
+<p><em>Получение релевантностей для слов (Strength GRU).</em> Сначала все релевантности инициализируются случайно (GlorotNormal). Когда слово <span class="math inline">\(i\)</span> встречается в предложении, его релевантность обновляется. Это обновление <span class="math inline">\(s_i^t\)</span> задается в виде одного шага GRU, которая на вход, помимо предыдущего значения релевантности <span class="math inline">\(s_i^{t-1}\)</span>, также берет скрытое состояние <span class="math inline">\(w_i\)</span> для этого слова в предложении и скрытое представление вопроса <span class="math inline">\(h_q\)</span>.</p>
+<h2 id="адаптивный-модуль-памяти">Адаптивный модуль памяти</h2>
+<p>В этом модуле слова из истории распределяются по упорядоченным банкам памяти, каждое слово хранится в виде тройки (индекс в словаре, скрытое состояние, релевантность). Ниже описаны четыре действия, они выполняются в указанном порядке для всех банков по очереди после обработки каждого нового предложения кодировщиком. Почти все из этого есть детерминированные дифференцируемые операции, кроме двух случаев, когда для принятия дискретого решения используется контроллер.</p>
+<ul>
+<li>
+<em>Добавить/обновить слова в банке</em> (после того, как кодировщик обработал предложение <span class="math inline">\(l\)</span> и остановился в состоянии <span class="math inline">\(h_l\)</span>). Если слово встретилось впервые, его добавляют в первый банк, при этом скрытое представление берут из lookup-матрицы. Если слово уже есть в каком-то банке, его состояние обновляют с помощью одного шага GRU, берущей на вход, помимо предыдущего состояния, состояние <span class="math inline">\(h_l\)</span>. В общем, здесь обновляют состояния и не трогают релевантности.</li>
+<li>
+<em>Распространение обновлений.</em> Чтобы учитывать порядок слов в предложении, при обновлении состояний каких-то слов в банке также обновляются слова, которые состоят с этими словами в синтаксической связи.</li>
+<li>
+<em>Перенос слов в следующие банки.</em> Контроллер на основе скрытого состояния слова в банке и его релевантности может принять решение перенести соответствующую слову тройку в следующий банк. После этого шага выполняется обновление релевантностей.</li>
+<li>
+<em>Создание нового банка.</em> Контроллер на основе скрытых состояний слов в последнем банке может принять решение создать новый пустой банк. В этом случае для последнего банка еще раз повторяются обновление, распространение и перенос.</li>
+</ul>
+<p>Контроллер описывается как-то так: задаем его решение в виде распределения Бернулли с параметром <span class="math inline">\(p \in \{0, 1\}\)</span>, вычисляемом небольшой сетью по соответствующему входу (скрытое состояние и релевантность для переноса слова, скрытые состояния слов в последнем банке для создания нового банка). А чтобы параметр был таким, используем специальную функцию потерь.</p>
+<h2 id="декодировщик">Декодировщик</h2>
+<p>Декодировщик работает так же, как в стандартном подходе (выше), только память вместо скрытых представлений предложений задается банками слов. Скрытое представление ответа считается для каждого банка отдельно, а потом усредняется с весами, затухающими для менее релевантных банков.</p>
+<p>Итоговая схема архитектуры:</p>
+<p><img src="../../post-images/adaptive-memory-networks/arch.png"></p>
+<p>Обрабатываем предложения по очереди, пропуская каждое через кодировщик и выполняя обновление памяти. В конце ищем ответ с помощью декодировщика, которому достаточно просмотреть не все банки, а только несколько последних.</p>
+<h2 id="функция-потерь">Функция потерь</h2>
+<p>Итоговый критерий качества - это сумма трех компонент:</p>
+<ol style="list-style-type: decimal">
+<li>Кросс-энтропия</li>
+<li>Регуляризатор на релевантности, который притягивает релевантность каждого слова к взвешенной сумме релевантнстей слов, состоящих в синтаксической связи с этим словом (веса зависят от силы этой близости)</li>
+<li>Регуляризатор на параметр контроллера <span class="math inline">\(p\)</span>. Параметр контроллера задает нам распределение над числом банков. Введем ожидаемое значение числа банков в виде геометрического распределения с некоторым параметром, близким к единице, и увеличивающимся при увеличении длины предложения. Регуляризатор - это KL-диверенция между двумя указанными распределениями на число банков. Если нарисовать значение регуляризатора при увеличении <span class="math inline">\(p\)</span>, то получается выпуклая вниз функция с резкими краями. Видимо, из-за этих резких краев она тянет <span class="math inline">\(p\)</span> к нулю или единице.</li>
+</ol>
+<p>Модель обучается end-to-end оптимизацией суммы этих трех компонент.</p>
+<h1 id="эксперименты">Эксперименты</h1>
+<p>Эксперименты проводились на стандартном для данной задачи датасете bAbI с вопросно-ответными парами. Предложенный алгорим работает хуже, чем state-of-the-art, но зато просматривает меньшую долю памяти при поиске ответа (меньшую до двух раз).</p>
+<p><img src="../../post-images/adaptive-memory-networks/exp-babi.png"></p>
+<h1 id="итог">Итог</h1>
+<p>В статье как-то невнятно описали основную фишку про то, как же происходит обработка дискретных решений при обратном распространении ошибки. В остальном, кроме идем создания новых банков, ничего особо впечатляющего нет, в том числе в экспериментах.</p>
+    </div>
+
+    <aside class="post-meta"><a class="post-author" href="../../authors/nadezhda-chirkova/">Надежда Чиркова</a>
+    <time class="post-date published dt-published" datetime="2017-11-07T02:50:38+03:00" itemprop="datePublished" title="07 ноября 2017">07 ноября 2017</time></aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script></article>
+</div>
+    </div>
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+    
+    
+        <footer id="footer"><p>Contents © 2017         <a href="mailto:info@bayesgroup.ru">BayesGroup</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
+            
+        </footer><script src="../../assets/js/jquery.min.js"></script><script src="../../assets/js/moment-with-locales.min.js"></script><script src="../../assets/js/fancydates.js"></script><!-- fancy dates --><script>
+    moment.locale("ru");
+    fancydates(2, "DD.MM.YYYY");
+    </script><!-- end fancy dates -->
+</body>
+</html>
