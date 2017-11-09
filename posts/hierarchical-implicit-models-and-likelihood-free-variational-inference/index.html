@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " vocab="http://ogp.me/ns" lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>Hierarchical Implicit Models and Likelihood-Free Variational Inference | Codename 'Sufficient Statistics'</title>
+<link href="../../assets/css/rst.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/poole.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/lanyon.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/code.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/custom.css" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=PT+Serif:400,400italic,700%7CPT+Sans:400">
+<link rel="canonical" href="http://bayesgroup.github.io/sufficient-statistics/posts/hierarchical-implicit-models-and-likelihood-free-variational-inference/">
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script><!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="Артём Гадецкий">
+<link rel="prev" href="../adaptive-memory-networks/" title="Adaptive Memory Networks" type="text/html">
+<meta property="og:site_name" content="Codename 'Sufficient Statistics'">
+<meta property="og:title" content="Hierarchical Implicit Models and Likelihood-Free Variational Inference">
+<meta property="og:url" content="http://bayesgroup.github.io/sufficient-statistics/posts/hierarchical-implicit-models-and-likelihood-free-variational-inference/">
+<meta property="og:description" content="Вводная
+В данной статье авторы придумали как делать приближенный байесовский вывод для моделей с неявно заданным правдоподобием, что это значит будет понятно далее. Авторы фиксируют определенный класс">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2017-11-10T01:51:29+03:00">
+<meta property="article:tag" content="deep learning">
+<meta property="article:tag" content="likelihood-free">
+<meta property="article:tag" content="mathjax">
+<meta property="article:tag" content="variational inference">
+</head>
+<body>
+    <a href="#content" class="sr-only sr-only-focusable">Перейти к главному содержимому</a>
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+            styles, `#sidebar-checkbox` for behavior. -->
+    <input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox"><!-- Toggleable sidebar --><div class="sidebar" id="sidebar">
+        <div class="sidebar-item">
+            <p>Обзоры не являются официальной позицией группы и предназначены исключительно для внутреннего использования.</p>
+        </div>
+        
+    <nav id="menu" role="navigation" class="sidebar-nav"><a class="sidebar-nav-item" href="../../authors/">Авторы</a>
+        <a class="sidebar-nav-item" href="../../archive.html">Архив</a>
+        <a class="sidebar-nav-item" href="../../categories/">Тэги</a>
+    
+    
+    </nav>
+</div>
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+          
+    <h3 id="brand" class="masthead-title">
+      <a href="../../" title="Codename 'Sufficient Statistics'" rel="home">Codename 'Sufficient Statistics'</a>
+    </h3>
+
+
+        </div>
+      </div>
+
+      <div class="container content" id="content">
+        
+<article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><div class="paper-link">
+        <a href="https://arxiv.org/abs/1702.08896">Paper</a>
+    </div>
+    <header><h1 class="post-title p-name entry-title" itemprop="headline name"><a href="." class="u-url">Hierarchical Implicit Models and Likelihood-Free Variational Inference</a></h1>
+
+        
+        <ul itemprop="keywords" class="tags">
+<li><a class="tag p-category" href="../../categories/deep-learning/" rel="tag">deep learning</a></li>
+            <li><a class="tag p-category" href="../../categories/likelihood-free/" rel="tag">likelihood-free</a></li>
+            <li><a class="tag p-category" href="../../categories/variational-inference/" rel="tag">variational inference</a></li>
+        </ul></header><div class="e-content entry-content" itemprop="articleBody text">
+    <h1 id="вводная">Вводная</h1>
+<p>В данной статье авторы придумали как делать приближенный байесовский вывод для моделей с неявно заданным правдоподобием, что это значит будет понятно далее. Авторы фиксируют определенный класс моделей и для них находят приближенное апостериорное распределение.</p>
+<h1 id="implicit-probabilistic-models">Implicit Probabilistic Models</h1>
+<h2 id="hierarchical-model">Hierarchical Model</h2>
+<p><span class="math display">\[p(x, z, \beta) = p(\beta) \prod_{n=1}^{N}p(x_n | z_n, \beta ) p(z_n | \beta)\]</span></p>
+<p>где <span class="math inline">\(x_n\)</span> – наблюдения, <span class="math inline">\(z_n\)</span> – локальная скрытая переменная, связанная с каждым объектом и <span class="math inline">\(\beta\)</span> – глобальная скрытая переменная.</p>
+<h2 id="hierarchical-implicit-model">Hierarchical Implicit Model</h2>
+<p>В предыдущем пункте авторы вводят довольно таки общую модель, к которой можно сводить модели из реальных задач. Все плотности считаются вычислимыми, т.е. для набора <span class="math inline">\((x, z, \beta)\)</span> мы можем взять и посчитать плотность. Теперь авторы предполагают, что пусть вычисление правдоподобия <span class="math inline">\(p(x_n | z_n, \beta)\)</span> нам недоступно, но мы знаем, как получать сэмплы, т.е. нам доступен генеративный процесс:</p>
+<p><span class="math display">\[x_n = g(\epsilon_n | z_n, \beta),\ \epsilon_n \sim s(\cdot)\]</span></p>
+<p>где <span class="math inline">\(\epsilon_n\)</span> - шум из известного распределения <span class="math inline">\(s(\cdot)\)</span>, из которого умеем сэмплировать, а <span class="math inline">\(g(\cdot)\)</span> - детерминированная функция, которая по <span class="math inline">\(\epsilon_n, z_n, \beta\)</span> выдает сэмпл <span class="math inline">\(x_n\)</span>. Тогда имея фиксированную модель <span class="math inline">\(p(x, z, \beta)\)</span> мы можем легко получить сэмпл <span class="math inline">\((x, z, \beta)\)</span>, сначала просэмплировав глобальные переменные <span class="math inline">\(\beta\)</span>, затем <span class="math inline">\(z_n | \beta\)</span>, а потом и <span class="math inline">\(x_n | z_n, \beta\)</span>. При такой постановке модель считается Implicit так как подсчет плотности не доступен. Ниже можно видеть графическое представление описанных моделей.</p>
+<p><img src="../../post-images/hierarchical-implicit-models-and-likelihood-free-variational-inference/figure1.png"></p>
+<h1 id="deep-implicit-models">Deep Implicit Models</h1>
+<p>По аналогии с нейросетями авторы предлагают сделать слои локальных скрытых переменных и вводят следующую модель:</p>
+<p><span class="math display">\[
+\begin{align*}
+z_{n, L} &amp;= g_{L}(\epsilon_{n, L} | \beta_L),\quad \epsilon_{n, L} \sim s(\cdot) \\
+z_{n, L-1} &amp;= g_{L-1}(\epsilon_{n, L-1} | z_{n, L}, \beta_{L-1}),\quad \epsilon_{n, L-1} \sim s(\cdot) \\
+&amp; \dots \\
+z_{n, 1} &amp;= g_{1}(\epsilon_{n, 1} | z_{n, 2}, \beta_1),\quad \epsilon_{n, 1} \sim s(\cdot) \\
+x_{n} &amp;= g_{0}(\epsilon_{n, 0} | z_{n, 1}, \beta_{0}),\quad \epsilon_{n, 0} \sim s(\cdot)
+\end{align*}
+\]</span></p>
+<p>В данном случае видим, что распределения на локальных скрытых переменных так же являются Implicit. Эту модель авторы особо не обсуждают и не изучают, просто говорят, что возможно построение и вывод в рамках такой модели используя придуманный подход. Далее ниже будем считать, что рассматривается модель Hierarchical Implicit Model (HIM).</p>
+<h1 id="variational-inference-for-implicit-models">Variational Inference for Implicit Models</h1>
+<p>Как всегда хотим получить <span class="math inline">\(p(z, \beta | x) = \frac{p(x, z, \beta)}{p(x)}\)</span>, но не можем, так как и так обычно все intractable, а теперь есть еще дополнительно невозможность вычислить плотность <span class="math inline">\(p(x, z, \beta)\)</span>. Будем искать постериор приближенно с помощью вариационного вывода. Напишем ELBO:</p>
+<p><span class="math display">\[\mathcal{L} = \mathbb{E}_{q(\beta, z | x)} [\log p(x, z, \beta) - \log q(\beta, z | x)]\]</span></p>
+<p>В качестве вариационного приближения будем рассматривать <span class="math inline">\(q(\beta, z | x) = q(\beta) \prod_{n=1}^{N} q(z_n | x_n, \beta)\)</span>. Подставим факторизации для <span class="math inline">\(p(\cdot)\)</span> и <span class="math inline">\(q(\cdot)\)</span> в <span class="math inline">\(\mathcal{L}\)</span>:</p>
+<p><span class="math display">\[\mathcal{L} = \mathbb{E}_{q(\beta)} [\log p(\beta) - \log q(\beta)] + \sum_{n=1}^{N} \mathbb{E}_{q(\beta)q(z_n | x_n, \beta)}[\log p(x_n, z_n | \beta) - \log q(z_n | x_n, \beta)]\]</span></p>
+<p>Здесь ни <span class="math inline">\(\log p(x_n, z_n | \beta)\)</span>, ни <span class="math inline">\(\log q(z_n | x_n, \beta)\)</span> невычислимы <a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a>. Поэтому авторы используют несколько трюков, описанных ниже.</p>
+<h2 id="adding-empirical-distribution-function-to-mathcall">Adding Empirical distribution function to <span class="math inline">\(\mathcal{L}\)</span>
+</h2>
+<p>Пусть <span class="math inline">\(q(x_n)\)</span> – эмпирическая функция распределения для наблюдений, а также будем считать, что вариационное совместное распределение <span class="math inline">\(q(x_n, z_n | \beta)\)</span> факторизуется следующим образом: <span class="math inline">\(q(x_n, z_n | \beta) = q(x_n) q(z_n | x_n, \beta)\)</span>. Так как на стадии вывода данные фиксированы, то можно считать, что <span class="math inline">\(\log q(x_n)\)</span> - константа. Соответственно вычтем <span class="math inline">\(\log q(x_n)\)</span> из <span class="math inline">\(\mathcal{L}\)</span>, аргмаксимум от этого не поменяется, но трюк позволит сделать следующее:</p>
+<p><span class="math display">\[
+\begin{align*}
+\mathcal{L}
+&amp;\propto \mathbb{E}_{q(\beta)} [\log p(\beta) - \log q(\beta)] \\
+&amp;+ \sum_{n=1}^{N} \mathbb{E}_{q(\beta)q(z_n | x_n, \beta)}[\log p(x_n, z_n | \beta) - \log q(z_n | x_n, \beta)] - \log q(x_n)
+\end{align*}
+\]</span></p>
+<p><span class="math display">\[\mathcal{L} \propto \mathbb{E}_{q(\beta)} [\log p(\beta) - \log q(\beta)] + \sum_{n=1}^{N} \mathbb{E}_{q(\beta)q(z_n | x_n, \beta)}[\log \frac{p(x_n, z_n | \beta)}{q(x_n, z_n \mid \beta)}]\]</span></p>
+<p>где <span class="math inline">\(\propto\)</span> означает "с точностью до аддитивной константы". Таким образом, у нас в ELBO появляется log-ratio - логарифм отношения двух плотностей: <span class="math inline">\(\log \frac{p(x_n, z_n | \beta)}{q(x_n, z_n \mid \beta)}\)</span>, и если научиться его хорошо приближать, то сможем оптимизировать ELBO.</p>
+<h2 id="ratio-estimation-trick">Ratio Estimation Trick</h2>
+<p>Пусть <span class="math inline">\(p^{*}(x)\)</span> - истинное распределение, <span class="math inline">\(q_{\theta}(x)\)</span> - модельное. <span class="math inline">\(X_p = \{x_1^{(p)}, \dots, x_n^{(p)}\}\)</span> - сэмплы из <span class="math inline">\(p^{*}(x)\)</span> и <span class="math inline">\(X_q = \{x_1^{(q)}, \dots, x_n^{(q)}\}\)</span> - сэмплы из <span class="math inline">\(q_{\theta}(x)\)</span>. Введем переменную <span class="math inline">\(y\)</span>:</p>
+<p><span class="math display">\[
+y = \begin{cases}
+1&amp; \forall x \in X_p\\ 
+0 &amp; \forall x \in X_q
+\end{cases}
+\]</span></p>
+<p>Тогда: <span class="math inline">\(p^{*}(x) = p(x | y = 1)\)</span> и <span class="math inline">\(q_{\theta}(x) = p(x | y = 0)\)</span></p>
+<p>Подставим и воспользуемся формулой Байеса:</p>
+<p><span class="math display">\[\small \frac{p^{*}(x)}{q_{\theta}(x)} = \frac{p(x | y = 1)}{p(x | y = 0)} = \frac{p(y=1 | x) p(x)}{p(y=1)} : \frac{p(y=0 | x) p(x)}{p(y=0)} = \frac{p(y=1 | x)}{p(y=0 | x)} \frac{p(y=0)}{p(y=1)}\]</span></p>
+<p><span class="math inline">\(\frac{p(y=0)}{p(y=1)}\)</span> можно оценить по имеющейся выборке, это просто соотношения классов, а <span class="math inline">\(p(y=1 | x)\)</span> можно моделировать с помощью классификатора (аналогично дискриминатору в GAN'ах). Обучать такой классификатор следует на так называемых proper scoring rules – функцииях потерь, с точки зрения которых лучше всего предсказывать вероятность первого класса, т.е.</p>
+<p><span class="math display">\[\arg \min_{b \in \mathbb{R}} \mathbb{E}[L(y, b)] = p(y=1 | x)\]</span></p>
+<p>Одна из таких функций потерь – log-loss, его и возьмем. Пусть <span class="math inline">\(p(y=1 | x) = \sigma(r(x, \lambda))\)</span>, где <span class="math inline">\(r(x, \lambda)\)</span> – модель, предсказывающая логиты, <span class="math inline">\(\sigma(\cdot)\)</span> – сигмоида, <span class="math inline">\(\lambda\)</span> – параметры модели. Запишем log-loss:</p>
+<p><span class="math display">\[L(\lambda, \theta) = \mathbb{E}_{p^{*}} [\log \sigma(r(x, \lambda))] + \mathbb{E}_{q_{\theta}}[\log (1 - \sigma(r(x, \lambda)))] \rightarrow \max_{\lambda}\]</span></p>
+<p>Оптимизируя данный функционал в конечном счете мы и получим оценку для log-ratio. Давайте разберемся почему. В Goodfellow et al. 2014 (Generative Adversarial Networks) показано, что оптимизируя такой функцинал оптимальным алгоритмом будет:</p>
+<p><span class="math display">\[a(x) = \frac{p^{*}(x)}{p^{*}(x) + q_{\theta}(x)}\]</span></p>
+<p>В нашем случае <span class="math inline">\(a(x) = \sigma(r(x, \lambda))\)</span>, тогда:</p>
+<p><span class="math display">\[\sigma(r(x, \lambda)) = \frac{p^{*}(x)}{p^{*}(x) + q_{\theta}(x)}\]</span></p>
+<p><span class="math display">\[r(x, \lambda) = \log \frac{p^{*}(x)}{q_{\theta}(x)}\]</span></p>
+<p>Мы видим, что обучая такой функционал, мы получаем то, что нам и требовалось - оценку для log-ratio. Возвращаясь к модели из статьи, запишем оптимизируемый функционал для получения оценки для log-ratio.</p>
+<p><span class="math display">\[D_{\log} = \mathbb{E}_{p(x_n, z_n | \beta)} [-\log \sigma(r(x_n, z_n, \beta, \theta))] + \mathbb{E}_{q(x_n, z_n | \beta)}[-\log(1 - \sigma(r(x_n, z_n, \beta, \theta)))]\]</span></p>
+<p>где <span class="math inline">\(\theta\)</span> - параметры <span class="math inline">\(r(\cdot)\)</span>.</p>
+<h2 id="gradients-for-stochastic-optimization">Gradients for stochastic optimization</h2>
+<p>Градиенты для оптимизации <span class="math inline">\(D_{\log}\)</span> берутся без особых проблем:</p>
+<p><span class="math display">\[\nabla_{\theta} D_{\log} = \mathbb{E}_{p(x_n, z_n | \beta)} [-\nabla_{\theta} \log \sigma(r(x_n, z_n, \beta, \theta))] + \mathbb{E}_{q(x_n, z_n | \beta)}[-\nabla_{\theta}\log(1 - \sigma(r(x_n, z_n, \beta, \theta)))]\]</span></p>
+<p>Теперь будем считать, что оценивать log-ratio мы умеем и запишем "обновленное" ELBO:</p>
+<p><span class="math display">\[\mathcal{L} = \mathbb{E}_{q(\beta)} [\log p(\beta) - \log q(\beta)] + \sum_{n=1}^{N} \mathbb{E}_{q(\beta)q(z_n | x_n, \beta)}[r(x_n, z_n, \beta, \theta)]\]</span></p>
+<p>Предполагается, что <span class="math inline">\(p(\beta)\)</span> и <span class="math inline">\(p(z_n | \beta)\)</span> - дифференцируемые. А также, что <span class="math inline">\(q(\beta)\)</span> и <span class="math inline">\(q(z_n | x_n, \beta)\)</span> репараметризуемые и в добавок мы должны уметь считать плотность <span class="math inline">\(q(\beta)\)</span>, что видно из формулы для ELBO. Репараметризуемость нужна для использования reparametrization trick и получения несмещенных градиентов:</p>
+<p><span class="math display">\[\beta = T_{global}(\delta_{global}, \lambda),\ \delta_{global} \sim s(\cdot)\]</span></p>
+<p>где <span class="math inline">\(T_{global}\)</span> - дифференцируемое детерминированное преобразование, а <span class="math inline">\(\lambda\)</span> - вариационные параметры. Аналогично для <span class="math inline">\(z_n | x_n, \beta\)</span>:</p>
+<p><span class="math display">\[z_n = T_{local}(\delta_{n}, x_n, \beta, \phi),\ \delta_{n} \sim s(\cdot)\]</span></p>
+<p>где <span class="math inline">\(T_{local}\)</span> - дифференцируемое детерминированное преобразование, а <span class="math inline">\(\phi\)</span> - вариационные параметры. Как видно из формулы для ELBO для <span class="math inline">\(q(z_n | x_n, \beta)\)</span> нет требования на умение считать плотность, поэтому в качестве вариационного приближения для этого распределения можно использовать implicit distribution. Таким образом, используя репараметризацию получаем градиенты:</p>
+<p><span class="math display">\[\nabla_{\lambda} \mathcal{L} = \mathbb{E}_{s(\delta_{global})}[\nabla_{\lambda}(\log p(\beta) - \log q(\beta))] + \sum_{n=1}^{N}\mathbb{E}_{s(\delta_{global})s(\delta_n)}[\nabla_{\lambda} r(x_n, z_n, \beta)]\]</span></p>
+<p>где градиенты протекают через дифференцируемое преобразование <span class="math inline">\(\beta = T_{global}(\cdot)\)</span>. Аналогично для <span class="math inline">\(\phi\)</span>:</p>
+<p><span class="math display">\[\nabla_{\phi} \mathcal{L} = \sum_{n=1}^{N} \mathbb{E}_{q(\beta)s(\delta_n)}[\nabla_{\phi}r(x_n, z_n, \beta)]\]</span></p>
+<p>Все градиенты получаются путем Монте Карло оценок. В итоге получаем следующий алгоритм:</p>
+<p><img src="../../post-images/hierarchical-implicit-models-and-likelihood-free-variational-inference/alg1.png"></p>
+<p>Как мы можем видеть, по сравнению с GAN'ами, где дискриминатор учится несколько эпох, а затем делается апдейт весов генератора, здесь все веса обновляются вместе. То есть сначала все нужные переменные сэмплируются, затем идет подсчет градиентов и одновременное обновление весов и так до сходимости.</p>
+<h1 id="experiments">Experiments</h1>
+<h2 id="модель-лотки-вольтерры-взаимодействия-двух-видов-типа-хищник-жертва">Модель Лотки — Вольтерры взаимодействия двух видов типа "хищник-жертва"</h2>
+<p>Эта модель представляет из себя процесс генерации данных следующего вида:</p>
+<p><span class="math display">\[
+\frac{dx_1}{dt} = \beta_1 x_1 - \beta_2 x_1 x_2 + \epsilon_1, \quad \epsilon_1 \sim \mathcal{N}(0, 10) \\
+\frac{dx_2}{dt} = -\beta_2 x_2 + \beta_3 x_1 x_2 + \epsilon_2, \quad \epsilon_2 \sim \mathcal{N}(0, 10)
+\]</span></p>
+<p>где <span class="math inline">\(x_1,\ x_2 \in \mathbb{R}_{+}\)</span> - популяции жертв и хищников соответственно, а <span class="math inline">\(\beta_1,\ \beta_2,\ \beta_3\)</span> - начальные параметры этого процесса на который делается вывод. То есть фиксируются какие-то беты, идет симуляция процесса с помощью сэмплирования и таким образом получаются "иксы" - по сути временной ряд. Задача - оценить начальные беты. Авторы накладывают логнормальное априорное на <span class="math inline">\(\beta_1,\ \beta_2,\ \beta_3\)</span>. Локальных скрытых переменных тут нет. На <span class="math inline">\(\beta\)</span> в качестве вариационного приближения авторы берут полностью факторизованное нормальное распределение, делают инференс с помощью придуманного им метода и сравнивают с различными методами(ABC, MCMC-ABC, SMC-ABC), показывая, что их способ точнее находит верные беты, а также что он масштабируемый.</p>
+<h2 id="bayesian-gan">Bayesian GAN</h2>
+<p>GAN:</p>
+<p><span class="math display">\[x_n = g(\epsilon_n, \theta),\ \epsilon_n \sim s(\cdot)\]</span></p>
+<p>где <span class="math inline">\(g(\cdot)\)</span> - нейронная сеть, <span class="math inline">\(\theta\)</span> - её параметры и <span class="math inline">\(s(\cdot)\)</span> - шум (нормальный или равномерный). Байесовским GAN'ом авторы называют все то же самое, только еще накладывают на <span class="math inline">\(\theta\)</span> априорное распределение. Они рассматривают следующий байесовский GAN:</p>
+<p><span class="math display">\[y_n = g(x_n, \epsilon_n | \theta),\ \epsilon_n \sim \mathcal{N}(0, 1)\]</span></p>
+<p>где <span class="math inline">\(y_n = \{1, \dots, K\}\)</span>, <span class="math inline">\(g(\cdot | \theta)\)</span> - двуслойная полносвязная нейронка с ReLU и batch-norm'ом. На веса этой нейронки накладывают нормальное априорное распределение: <span class="math inline">\(\theta \sim \mathcal{N}(0, 1)\)</span>.</p>
+<p>В качестве моделей для вариационного приближения для <span class="math inline">\(\theta\)</span> авторы рассматривают mean field аппроксимацию в семействе полностью факторизованных нормальных распределений и MAP оценку. Байесовский GAN они сравнивают с байесовской нейронной сетью, которая имеет аналогичный генеративный процесс для <span class="math inline">\(y_n\)</span>, но вместо добавления шума <span class="math inline">\(\epsilon_n\)</span>, в байесовской нейронной сети, сначала получают распределение на метках и потом производится сэмплирование из категориального распределения на метках. Для байесовской нейронной сети авторы берут аналогичные вариационные приближения. Авторы тестируют модели на нескольких задачах классификации и показывают, что байесовский GAN работает лучше.</p>
+<p><img src="../../post-images/hierarchical-implicit-models-and-likelihood-free-variational-inference/table1.png"></p>
+<h2 id="injecting-noise-into-hidden-units-самый-плохо-описанный-эксперимент">Injecting Noise into Hidden Units (самый плохо описанный эксперимент)</h2>
+<p>Авторы предлагают добавить шум и implicit distribution в RNN: пусть <span class="math inline">\((x_1, \dots, x_T)\)</span> - последовательность токенов и</p>
+<p><span class="math display">\[z_t = g_z(x_{t-1}, z_{t-1}, \epsilon_{t, z}),\quad \epsilon_{t, z} \sim \mathcal{N}(0, 1)\]</span> <span class="math display">\[x_t = g_x(z_t, \epsilon_{t, x}),\quad \epsilon_{t, x} \sim \mathcal{N}(0, 1)\]</span></p>
+<p>где <span class="math inline">\(g_z\)</span> и <span class="math inline">\(g_x\)</span> - линейные преобразования с последующей ReLU активацией и LayerNorm'ом. На веса и байесы накладывают стандартное нормальное априорное. В качестве вариационного приближения авторы берут аналогичную implicit model, только видимо наоборот, по <span class="math inline">\(x\)</span>-ам генерируются <span class="math inline">\(z\)</span>-ки. Авторы тестируют модель на задаче генерации правильной последовательности арифмитических операций и переменных при написании формулы и получают что-то адекватное.</p>
+<p><img src="../../post-images/hierarchical-implicit-models-and-likelihood-free-variational-inference/rnnexp.png"></p>
+<h2 id="stability-of-ratio-estimator-appendix">Stability of Ratio Estimator (Appendix)</h2>
+<p>Авторы взяли байесовскую линейную регрессию, где можно аналитически посчитать log-ratio и показали, что с течением итераций их алгоритма оценка для log-ratio становится лучше.</p>
+<h1 id="выводы">Выводы</h1>
+<p>В данной статье авторы придумали метод вывода для моделей с неявным правдоподобием. Авторы рассмотрели довольно общую модель состоящую из наблюдений, глобальных и локальных скрытых переменных, в которой функция правдоподобия задана генеративным процессом и вычисление плотности нам не доступно. Так же были проведены довольно таки разные эксперименты и было показано, что это работает. В плане общих математических трюков можно обратить внимание на Ratio Estimation Trick.</p>
+<div class="footnotes">
+<hr>
+<ol>
+<li id="fn1"><p>Примечание А. Соболева: думаю, можно было бы задать приближённое апостериорное <span class="math inline">\(q(z_z|x_n, \beta)\)</span>, плотность которого можно было бы посчитать, но выразительная сила такого распределения была бы невелика, поэтому лучше рассмотреть неявное приближение.<a href="#fnref1">↩</a></p></li>
+</ol>
+</div>
+    </div>
+
+    <aside class="post-meta"><a class="post-author" href="../../authors/artiom-gadetskii/">Артём Гадецкий</a>
+    <time class="post-date published dt-published" datetime="2017-11-10T01:51:29+03:00" itemprop="datePublished" title="10 ноября 2017">10 ноября 2017</time></aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script></article>
+</div>
+    </div>
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+    
+    
+        <footer id="footer"><p>Contents © 2017         <a href="mailto:info@bayesgroup.ru">BayesGroup</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
+            
+        </footer><script src="../../assets/js/jquery.min.js"></script><script src="../../assets/js/moment-with-locales.min.js"></script><script src="../../assets/js/fancydates.js"></script><!-- fancy dates --><script>
+    moment.locale("ru");
+    fancydates(2, "DD.MM.YYYY");
+    </script><!-- end fancy dates -->
+</body>
+</html>
