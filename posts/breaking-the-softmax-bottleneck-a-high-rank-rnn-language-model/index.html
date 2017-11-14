@@ -25,6 +25,7 @@ MathJax.Hub.Config({
 });
 </script><!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="Артём Соболев">
 <link rel="prev" href="../hierarchical-implicit-models-and-likelihood-free-variational-inference/" title="Hierarchical Implicit Models and Likelihood-Free Variational Inference" type="text/html">
+<link rel="next" href="../kernel-implicit-variational-inference/" title="Kernel Implicit Variational Inference" type="text/html">
 <meta property="og:site_name" content="Codename 'Sufficient Statistics'">
 <meta property="og:title" content="Breaking the Softmax Bottleneck: A High-Rank RNN Language Model">
 <meta property="og:url" content="http://bayesgroup.github.io/sufficient-statistics/posts/breaking-the-softmax-bottleneck-a-high-rank-rnn-language-model/">
@@ -34,7 +35,6 @@ MathJax.Hub.Config({
 <meta property="og:type" content="article">
 <meta property="article:published_time" content="2017-11-14T00:33:03+03:00">
 <meta property="article:tag" content="deep learning">
-<meta property="article:tag" content="language modeling">
 <meta property="article:tag" content="mathjax">
 <meta property="article:tag" content="text modeling">
 </head>
@@ -79,7 +79,6 @@ MathJax.Hub.Config({
         
         <ul itemprop="keywords" class="tags">
 <li><a class="tag p-category" href="../../categories/deep-learning/" rel="tag">deep learning</a></li>
-            <li><a class="tag p-category" href="../../categories/language-modeling/" rel="tag">language modeling</a></li>
             <li><a class="tag p-category" href="../../categories/text-modeling/" rel="tag">text modeling</a></li>
         </ul></header><div class="e-content entry-content" itemprop="articleBody text">
     <p>Довольно интересная статья о том, что простого софтмакса на выходе языковой модели недостаточно для достаточнго адекватного представления языка.</p>
@@ -135,7 +134,7 @@ p(x|c) = \sum_{k=1}^K \pi_{c,k} \text{Softmax}(h^T_{c,k} w_x),
 <p>Наконец, авторы посмотрели на семплы (полученные бимсёрчем на PTB) смеси контекстов (раз она работает чуть лучше софтмакса) и смеси контекста и попытались сделать далеко идущие выводы. Я их копировать не буду, но можете сами посмотреть на семплы:</p>
 <p><img src="../../post-images/breaking-the-softmax-bottleneck-a-high-rank-rnn-language-model/table6.png"></p>
 <h1 id="резюме">Резюме</h1>
-<p>Довольно интересная работа, показывающая, что сколько бы совершенную RNN'ку вы ни имели, всегда будет бутылочное горлышно в виде размерности векторного представления токена и контекста. В этой статье предлагается, по-сути, нелинейное (ну, существенно более нелинейное, чем нормированная экспонента скалярного произведения) преобразование этих векторных представлений, что позволяет повысить выразительную силу получающейся вероятностной модели.</p>
+<p>Довольно интересная работа, показывающая, что сколько бы совершенную RNN'ку вы ни имели, всегда будет бутылочное горлышно в виде размерности векторного представления токена и контекста. В этой статье предлагается, по-сути, нелинейное (ну, существенно более нелинейное, чем нормированная экспонента скалярного произведения) преобразование этих векторных представлений, что позволяет повысить выразительную силу получающейся вероятностной модели. <a href="https://github.com/zihangdai/mos">Код</a> доступен на гитхабе.</p>
 <p>Вместе с тем, неочевидно, какой эффект это всё оказывает на время выполнения. Кажется, что последний слой, с софтмаксами очень толстый и считать его много раз не очень приятно. С другой стороны, возможно такой подход позволит пользоваться эмбеддингами меньшей размерности без значительных потерь в качестве. К сожалению, на эти вопросы статья не отвечает.</p>
 <p>А ещё мне кажется, что нужно подумать в сторону <strong>тензорных разложений</strong>!</p>
 <div class="footnotes">
@@ -143,7 +142,7 @@ p(x|c) = \sum_{k=1}^K \pi_{c,k} \text{Softmax}(h^T_{c,k} w_x),
 <ol>
 <li id="fn1"><p>Бесконечное количество контекстов не ломает рассуждений, но заставляет нас заменить инструмент линейной алгебры на функциональный анализ.<a href="#fnref1">↩</a></p></li>
 <li id="fn2"><p>Интересно было бы посмотреть на ранги каких-нибудь несильно сложных грамматик, а потом попробовать их выучить.<a href="#fnref2">↩</a></p></li>
-<li id="fn3"><p>В укор авторам скажу, <strong>в статье нигде не указано, сколько софтмаксов смешивается</strong> (либо искусно спрятано, ибо я не нашёл, нашёл только их <a href="https://github.com/zihangdai/mos">код на гитхабе</a>, там 10)<a href="#fnref3">↩</a></p></li>
+<li id="fn3"><p>Количество использованных компонент смеси тщательно скрыто в самом конце статьи, в аппендиксе Б, и составляет 15.<a href="#fnref3">↩</a></p></li>
 <li id="fn4"><p>Тут можно возразить, что у нас уже есть нейросеть под эмбеддингами, но важно понимать, что та нейросеть только генерирует эти векторные представления, а комбинируются они всё-таки линейно. Это как если бы вы использовали линейную регрессию, <em>веса</em> которой генерировались бы нейросетью. Повысило ли бы это выразительную способность модели?<a href="#fnref4">↩</a></p></li>
 </ol>
 </div>
