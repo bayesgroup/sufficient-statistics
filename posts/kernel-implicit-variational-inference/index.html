@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " vocab="http://ogp.me/ns" lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>Kernel Implicit Variational Inference | Codename 'Sufficient Statistics'</title>
+<link href="../../assets/css/rst.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/poole.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/lanyon.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/code.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/custom.css" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=PT+Serif:400,400italic,700%7CPT+Sans:400">
+<link rel="canonical" href="http://bayesgroup.github.io/sufficient-statistics/posts/kernel-implicit-variational-inference/">
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script><!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="Артём Гадецкий">
+<link rel="prev" href="../breaking-the-softmax-bottleneck-a-high-rank-rnn-language-model/" title="Breaking the Softmax Bottleneck: A High-Rank RNN Language Model" type="text/html">
+<meta property="og:site_name" content="Codename 'Sufficient Statistics'">
+<meta property="og:title" content="Kernel Implicit Variational Inference">
+<meta property="og:url" content="http://bayesgroup.github.io/sufficient-statistics/posts/kernel-implicit-variational-inference/">
+<meta property="og:description" content="Вводная
+В этой статье авторы заниматся вариационным выводом для моделей со скрытыми переменными \(p(x, z) = p(x | z) p(z)\). Вариационным приближением является implicit distribution \(q(z)\), плотност">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2017-11-14T06:16:47+03:00">
+<meta property="article:tag" content="deep learning">
+<meta property="article:tag" content="implicit models">
+<meta property="article:tag" content="kernels">
+<meta property="article:tag" content="mathjax">
+<meta property="article:tag" content="variational inference">
+</head>
+<body>
+    <a href="#content" class="sr-only sr-only-focusable">Перейти к главному содержимому</a>
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+            styles, `#sidebar-checkbox` for behavior. -->
+    <input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox"><!-- Toggleable sidebar --><div class="sidebar" id="sidebar">
+        <div class="sidebar-item">
+            <p>Обзоры не являются официальной позицией группы и предназначены исключительно для внутреннего использования.</p>
+        </div>
+        
+    <nav id="menu" role="navigation" class="sidebar-nav"><a class="sidebar-nav-item" href="../../authors/">Авторы</a>
+        <a class="sidebar-nav-item" href="../../archive.html">Архив</a>
+        <a class="sidebar-nav-item" href="../../categories/">Тэги</a>
+    
+    
+    </nav>
+</div>
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+          
+    <h3 id="brand" class="masthead-title">
+      <a href="../../" title="Codename 'Sufficient Statistics'" rel="home">Codename 'Sufficient Statistics'</a>
+    </h3>
+
+
+        </div>
+      </div>
+
+      <div class="container content" id="content">
+        
+<article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><div class="paper-link">
+        <a href="https://openreview.net/forum?id=r1l4eQW0Z&amp;noteId=r1l4eQW0Z">Paper</a>
+    </div>
+    <header><h1 class="post-title p-name entry-title" itemprop="headline name"><a href="." class="u-url">Kernel Implicit Variational Inference</a></h1>
+
+        
+        <ul itemprop="keywords" class="tags">
+<li><a class="tag p-category" href="../../categories/deep-learning/" rel="tag">deep learning</a></li>
+            <li><a class="tag p-category" href="../../categories/implicit-models/" rel="tag">implicit models</a></li>
+            <li><a class="tag p-category" href="../../categories/kernels/" rel="tag">kernels</a></li>
+            <li><a class="tag p-category" href="../../categories/variational-inference/" rel="tag">variational inference</a></li>
+        </ul></header><div class="e-content entry-content" itemprop="articleBody text">
+    <h1 id="вводная">Вводная</h1>
+<p>В этой статье авторы заниматся вариационным выводом для моделей со скрытыми переменными <span class="math inline">\(p(x, z) = p(x | z) p(z)\)</span>. Вариационным приближением является implicit distribution <span class="math inline">\(q(z)\)</span>, плотность которого недоступна, зато доступен генеративный процесс <span class="math inline">\(z\)</span>’ок. В <a href="https://bayesgroup.github.io/sufficient-statistics/posts/hierarchical-implicit-models-and-likelihood-free-variational-inference/">прошлой разобранной статье</a> решается похожая задача, но более общая (likelihood там так же может быть implicit distribution). Там для преодоления препятствия в виде implicit distributions в ELBO используется Ratio Estimation Trick. В этой статье авторы, можно сказать, занимаются улучшением раннее разобранного подхода. Перейдем к деталям.</p>
+<h1 id="background">Background</h1>
+<p>Имеется генеративная модель со скрытми переменными <span class="math inline">\(p(x, z) = p(x|z)p(x)\)</span>, где <span class="math inline">\(x\)</span> - наблюдения, а <span class="math inline">\(z\)</span> - скрытые переменные. Задача найти приближение к <span class="math inline">\(q_{\phi}(z) = p(z|x)\)</span>, так как честный подсчет апостериорного невозможен. Как обычно это делается в вариационном выводе, выбирается параметрическое вариационное семейство <span class="math inline">\(q_{\phi}(z)\)</span> и максимизируется ELBO по вариационным параметрам:</p>
+<p><span class="math display">\[\mathcal{L} = \mathbb{E}_{q_{\phi}(z)}[\log p(x|z)] - KL(q_{\phi}(z) || p(z))\]</span></p>
+<p>В случае если <span class="math inline">\(q_{\phi}(z)\)</span> - implicit distribution, то подсчет <span class="math inline">\(KL(\cdot || \cdot)\)</span> напрямую невозможен, так как вычисление плотности <span class="math inline">\(q_{\phi}(z)\)</span> нам недоступно. В таких случаях можно прибегнуть к Ratio Estimation Trick (см. <a href="https://bayesgroup.github.io/sufficient-statistics/posts/hierarchical-implicit-models-and-likelihood-free-variational-inference/">разбор</a>) и оценить <span class="math inline">\(\log \frac{q_{\phi}(z)}{p(z)}\)</span>.</p>
+<p><span class="math display">\[KL(q_{\phi}(z) || p(z)) = \mathbb{E}_{q_{\phi}(z)} \left[\log \frac{q_{\phi}(z)}{p(z)}\right]\]</span></p>
+<p>Авторы говорят, что такой подход хорош, но в реальных задачах, при получении оценки для log-ratio (Ratio Estimation Trick) будем сэмплировать из двух распределений и в пространствах большой размерности при маленьком количестве сэмплов имеем большую дисперсию. А потом еще и для оптимизации ELBO мы будем брать сэмплы, в итоге градиенты будут шумными, и плохо все учится, поэтому если есть возможность получить аналитическое выражение для log-ratio, то будет лучше. Звучит логично, можно провести параллель с разобранными раннее Deep Exponential Families и Rao Blackwellization, суть которого состоит в том, что если есть возможность избавиться от некоторых матожиданий и посчитать их аналитически, то это нужно делать.</p>
+<p>Второй аргумент авторов состоит в том, что часто бывает, что скрытые переменные имеют большую размерность и в подходе с обычным Ratio Estimation Trick это мешает, так как используемый классификатор зависит от этих скрытых переменных и сложно масштабировать метод, об этом говорят и авторы статьи Hierarchical Implicit Models and Likelihood-Free Variational Inference. Также еще одна проблема с обычным Ratio Estimation Trick подходом состоит в том, что там для обучения классификатора обычно делается всего пару итераций, то есть оптимум многовероятно не достигается, и классификатору трудно различать настоящие сэмплы от модельных, что также создает проблемы при обучении.</p>
+<h1 id="kernel-implicit-variational-inference">Kernel Implicit Variational Inference</h1>
+<h2 id="estimating-the-kl-term">Estimating the KL term</h2>
+<p>Авторы предлагают воспользоваться ядерной линейной регрессией для оценивания <span class="math inline">\(\log \frac{q_{\phi}(z)}{p(z)}\)</span>.</p>
+<p>Пусть <span class="math inline">\(z \in \mathbb{R}^{d}\)</span>, <span class="math inline">\(r(z) = \frac{q(z)}{p(z)}\)</span> истинное отношение. Будем моделировать его с помощью <span class="math inline">\(\widehat{r}(z) \in \mathcal{H}\)</span>, где <span class="math inline">\(\mathcal{H}\)</span> - RKHS, порождённое ядром <span class="math inline">\(k(z, z'): \mathbb{R}^d \times \mathbb{R}^{d} \rightarrow \mathbb{R}\)</span>. По сути <span class="math inline">\(\widehat{r}(z) = \sum w_i \phi_i(z)\)</span>, где <span class="math inline">\(w_i\)</span> - настраиваемые веса, а <span class="math inline">\(\phi_i(z)\)</span> - базисные функции, определяемые ядром.</p>
+<p>В качестве целевой функции для ядерной регрессии берется (регуляризованная) оценка по Монте Карло для Least Squares Importance Fitting (Kanamori et al. 2009): <span class="math display">\[\mathcal{J} = \frac{1}{2} \int (\widehat{r}(z) - r(z))^2 p(z) dz = \tfrac{1}{2}\mathbb{E}_{p(z)}[\widehat{r}^2(z)] - \mathbb{E}_{q(z)}[\widehat{r}(z)] + C \]</span></p>
+<p>Тогда оптимизационная задача выглядит следующим образом: <span class="math display">\[\min_{\widehat{r} \in \mathcal{H}} L(\widehat{r}) + \frac{\lambda}{2}\lVert \widehat{r} \rVert^{2}_{\mathcal{H}}\]</span></p>
+<p>Где <span class="math display">\[L(\widehat{r}) = \frac{1}{2 n_{p}} \sum_{i=1}^{n_p} \widehat{r}(z_i^p)^2 - \frac{1}{n_q} \sum_{j=1}^{n_q}\widehat{r}(z_j^q),\ z_i^p \sim p(z),\ z_j^q \sim q(z)\]</span></p>
+<p>Можно показать (применение representer theorem (Scholkopf et al. 2001) для этой постановки задачи), что оптимизируя такой функционал решение будет выглядеть следующим образом:</p>
+<p><span class="math display">\[\widehat{r}(z) = \sum_{i=1}^{n_p} \alpha_i k(z_i^p, z) + \sum_{i=1}^{n_q} \beta_i k(z_i^q, z)\]</span></p>
+<p>где <span class="math inline">\(\alpha_i\)</span> и <span class="math inline">\(\beta_i\)</span> - весовые коэффициенты. Тогда подставляя это выражение в оптимизируемый функционал и беря градиенты по весам, получаем следующие оптимальные значения для весов:</p>
+<p><span class="math display">\[\beta = \frac{1}{\lambda n_q} \textbf{1}\]</span></p>
+<p><span class="math display">\[\alpha = - \frac{1}{\lambda n_q n_p} \left(\frac{1}{n_p} K_p + \lambda I\right)^{-1} K_{pq} \textbf{1}\]</span></p>
+<p>где <span class="math inline">\((K_p)_{i, j} = k(z_i^p, z_j^p)\)</span>, <span class="math inline">\((K_{pq})_{i, j} = k(z_i^p, z_j^q)\)</span> и <span class="math inline">\((K_q)_{i, j} = k(z_i^q, z_j^q)\)</span>. В качестве <span class="math inline">\(k(z, z')\)</span> авторы берут RBF ядро. Таким образом авторы и получают аналитический вид для log ratio и оценку KL члена они получают с помощью сэмплирования и МонтеКарло оценивания:</p>
+<p><span class="math display">\[KL(q(z) || p(z)) = \frac{1}{n_q} \sum_{i=1}^{n_q}\log \widehat{r}(z_i^{q})\]</span></p>
+<p>Так как <span class="math inline">\(\widehat{r}(\cdot)\)</span> должно быть положительным из-за логарифма, то авторы дополнительно клипают значения <span class="math inline">\(\widehat{r}(\cdot)\)</span> и значение для клиппинга подбирают кроссвалидацией. Говорят, что значения клиппинга особо не влияют, так как аналитическое решение достаточно хорошо приближает настоящее отношение, поэтому конечное решение не чувствительно к этому параметру.</p>
+<h2 id="the-reverse-ratio-trick">The reverse ratio trick</h2>
+<p>Можно заметить, что при оптимизации <span class="math inline">\(L(\widehat{r}) + \frac{\lambda}{2}\lVert \widehat{r} \rVert^{2}_{\mathcal{H}}\)</span> метод будет присваивать бóльшие веса семплам из регионов, в которых располагается большая часть вероятностной массы <span class="math inline">\(p(z)\)</span>. А оценивать <span class="math inline">\(KL(\cdot || \cdot)\)</span> мы будем с помощью сэмплирования из <span class="math inline">\(q(z)\)</span>. Поэтому пока <span class="math inline">\(q(z)\)</span> и <span class="math inline">\(p(z)\)</span> будут сильно различаться в том, где располагается их основная вероятностная масса, оценка <span class="math inline">\(KL(\cdot || \cdot)\)</span> будет хуже чем могла бы быть. Чтобы исправить это, авторы предлагают простой трюк: давайте приближать <span class="math inline">\(\frac{p(z)}{q(z)}\)</span> вместо <span class="math inline">\(\frac{q(z)}{p(z)}\)</span>, а потом считать KL член как <span class="math inline">\(-\mathbb{E}_{q(z)} [\log \frac{p(z)}{q(z)}]\)</span>. Обозначив за <span class="math inline">\(\widehat{r}_{pq}\)</span> оценку для <span class="math inline">\(\frac{p(z)}{q(z)}\)</span> получаем оценку для KL члена <span class="math inline">\(-\mathbb{E}_{q(z)} \log \widehat{r}_{pq}(z)\)</span>. Их эксперименты показали, что такой трюк дает более точные оценки.</p>
+<h2 id="gradients">Gradients</h2>
+<p>В общем научились приближать log-ratio, осталось поговорить о градиентах по вариационным параметрам, которые нужны для оптимизации ELBO. Считать эти градиенты будем с помощью reparametrization trick. Таким образом, нужно просто потребовать, чтобы <span class="math inline">\(q_{\phi}(z)\)</span> было репараметрезуемо, что вроде как несложно, так как у нас implicit distribution.</p>
+<p><span class="math display">\[z = g(\epsilon, \phi), \quad \epsilon \sim s(\cdot)\]</span></p>
+<p>где <span class="math inline">\(g\)</span> - детерминированная функция с вариационными параметрами <span class="math inline">\(\phi\)</span>, а <span class="math inline">\(s(\cdot)\)</span> - известное распределение. Тогда получаем градиенты для ELBO:</p>
+<p><span class="math display">\[
+\begin{align*}
+\nabla_{\phi}\mathcal{L}
+&amp;= \nabla_{\phi} [ \mathbb{E}_{q_{\phi}(z)} \log p(x|z) + \mathbb{E}_{q_{\phi}(z)} \log \widehat{r}_{pq}(z)] \\
+&amp;= \mathbb{E}_{\epsilon \sim s(\cdot)} \nabla_{\phi} \log p(x|g(\epsilon, \phi)) + \mathbb{E}_{\epsilon \sim s(\cdot)} \log \widehat{r}_{pq}(g(\epsilon, \phi))
+\end{align*}\]</span></p>
+<p>Градиенты как всегда оцениваем с помощью сэмплирования. В итоге получаем алгоритм:</p>
+<p><img src="../../post-images/kernel-implicit-variational-inference/algorithm1.png" class="medium"></p>
+<h1 id="пример-implicit-variational-bayesian-neural-networks">Пример: Implicit Variational Bayesian Neural Networks</h1>
+<p>В Байесовских нейронных сетях в качестве вариационного приближения на веса обычно берется полностью факторизованное нормальное распределение, применение implicit distribution проблематично из-за большой размерности весов. Здесь авторы предлагают достаточно эффективный метод для генерации матриц и соответственно использования implicit distribution в качестве вариацинного приближения.</p>
+<p>Пусть <span class="math inline">\(W = \{ W_{l} \}_{l=1}^{L}\)</span>, где <span class="math inline">\(W_{l}\)</span> - веса сети в <span class="math inline">\(l\)</span>-ом слое. Имея вход <span class="math inline">\(x\)</span>, выход <span class="math inline">\(y\)</span> моделируется следующим образом:</p>
+<p><span class="math display">\[W \sim \mathcal{N}(0, I),\ \widehat{y} = f_{NN}(x, W),\ y \sim \mathcal{P}(\widehat{y}, \theta)\]</span></p>
+<p>где <span class="math inline">\(y\)</span> из распределения <span class="math inline">\(\mathcal{P}\)</span>: в случае регрессии <span class="math inline">\(\mathcal{P}\)</span> обычно нормальное со средним <span class="math inline">\(\widehat{y}\)</span>, а в случае с классификацией категориальное, где <span class="math inline">\(\widehat{y}\)</span> выступают в качестве логитов. Как мы знаем, настоящий постериор в байсовских нейронных сетях intractable. Поэтому применяют вариационный вывод. Пусть <span class="math inline">\(X=\{ x_i \}_{i=1}^{N}\)</span> - наблюдения, <span class="math inline">\(Y=\{ y_i \}_{i=1}^{N}\)</span> - метки. Тогда ELBO:</p>
+<p><span class="math display">\[\mathcal{L} = \mathbb{E}_{q_{\phi}(W)}[\log p(Y|X, W)] - KL(q_{\phi}(W) | p(W))\]</span></p>
+<p>где в качестве вариционного семейства <span class="math inline">\(q_{\phi}(W)\)</span> берется полностью факторизованное нормальное распределение. Авторы же предлагают воспользоваться их методом и вводят implicit distribution специального вида для генерации матриц:</p>
+<p><span class="math display">\[W^{0}_{l} \sim \mathcal{N}(0, I),\ W^{q}_{l} = MMNN_{\phi_l}(W^{0}_{l})\]</span></p>
+<p>где <span class="math inline">\(\phi_l\)</span> - вариационные параметры для весов из <span class="math inline">\(l\)</span>-ого слоя, а <span class="math inline">\(MMNN\)</span> функция, принимающая на вход и дающая на выходе матрицу, которая считается по следующему правилу.:</p>
+<p><img src="../../post-images/kernel-implicit-variational-inference/algorithm2.png" class="medium"></p>
+<p>Таким образом можно моделировать вариационное приближение для байесовских нейронных сетей. Причем такая архитектура (MMNN) эффективнее чем, если бы мы прогоняли <span class="math inline">\(W^{0}_{l}\)</span> через fully-connected (MLP) сеть при одинаковом количестве слоев в <span class="math inline">\(MMNN\)</span> и <span class="math inline">\(MLP\)</span>.</p>
+<h1 id="experiments">Experiments</h1>
+<h2 id="toy-gmm">Toy GMM</h2>
+<p>Первый эксперимент - игрушечный. Авторы сгенерировали данные из одномерной смеси двух гауссиан с заданными параметрами и решили посмотреть можно ли приблизить настощую плотность <span class="math inline">\(p(x)\)</span> с помощью их подхода. В качестве вариационного приближения они взяли 1) одномерное нормальное распределение и учили матожидание и дисперсию, 2) implicit distribution <span class="math inline">\(x = g(\epsilon),\ \epsilon \sim \mathcal{N}(0, 1)\)</span>, где <span class="math inline">\(g\)</span> - двуслойная нейронная сеть и учим параметры этой сети. Собственно получили следующий результат:</p>
+<p><img src="../../post-images/kernel-implicit-variational-inference/figure1.png" class="large"></p>
+<p>Мне стало интересно и я поигрался с этим экспериментом (the reverse ratio trick не стал применять, но все удалось и так). Реализовал метод и получил аналогичные результаты:</p>
+<figure><img src="../../post-images/kernel-implicit-variational-inference/exp_kivi.png" class="medium"><figcaption style="text-align: center">
+KIVI: Оранжевый - настоящее распределение. Синий - приближение.
+</figcaption></figure><figure><img src="../../post-images/kernel-implicit-variational-inference/exp_vi.png" class="medium"><figcaption style="text-align: center">
+VI(normal posterior): Оранжевый - настоящее распределение. Синий - приближение.
+</figcaption></figure><p>Одномодальным распределением не получилось приблизить двумодальное (Ваш Кэп), а вот implicit distribution чувствует себя вполне комфортно и с успехом моделирует истинное.</p>
+<h2 id="regression">Regression</h2>
+<p>Теперь авторы решили потестить их метод на различных датасетах для регрессии. В качестве вариационного приближения на веса они взяли implicit distribution <span class="math inline">\(W = g(\epsilon),\ \epsilon \sim \mathcal{N}(0, I)\)</span>, где <span class="math inline">\(g\)</span> - однослойная сеть вместо того, что было предложено в пункте Implicit Variational Bayesian Neural Networks, так как они говорят, что модельки маленькие и тут не нужно использовать этот подход. Получили следующие результаты:</p>
+<p><img src="../../post-images/kernel-implicit-variational-inference/table1.png"></p>
+<p>Видно, что работает сравнимо или лучше чем state-of-the-art.</p>
+<h2 id="classification">Classification</h2>
+<p>Здесь взяли MNIST и воспользовались вариционным приближением, предложенным в пункте Implicit Variational Bayesian Neural Networks. То есть в качестве вариационного приближения на веса взяли двуслойнную MMNN.</p>
+<p><img src="../../post-images/kernel-implicit-variational-inference/mnist.png"></p>
+<p>Видно, что работает + интересный подход для вариационного приближения, когда нужно сэмплировать матрицы.</p>
+<h2 id="vae">VAE</h2>
+<p>Здесь авторы тестировали их метод на задаче генерации бинаризованного MNIST и CelebA. VAE данные генерируются следующим образом:</p>
+<p><span class="math display">\[z \sim \mathcal{N}(0, I),\ x = \mathcal{P}(f_{NN}(z))\]</span></p>
+<p>где <span class="math inline">\(\mathcal{P}\)</span> - распределение Бернулли в случае бинаризованного MNIST, и нормальное в случае с CelebA, а <span class="math inline">\(f_{NN}(z)\)</span> - нейронная сеть возвращающая параметры соответствующего распределения <span class="math inline">\(\mathcal{P}\)</span>.</p>
+<p>В случае бинаризованного MNIST’а вариацинное приближение:</p>
+<p><span class="math display">\[z = g(\epsilon),\ \epsilon \sim \mathcal{N}(0, \Sigma)\]</span></p>
+<p>где <span class="math inline">\(g\)</span> - двуслойнная нейронная сеть с ReLU активациями. Матрица <span class="math inline">\(\Sigma\)</span> - диагональная и дисперсии настраиваются во время обучения. Для MNIST чего-то они не захотели фоточки прикладывать, только график ELBO, где видно, что их метод достигает лучшей вариационной нижней оценки.</p>
+<p><img src="../../post-images/kernel-implicit-variational-inference/vae.png" class="large"></p>
+<p>В случае с CelebA decoder network у них такой же как в статье DCGAN. А вариацонное приближение - Deep CNN с архитектурой, симметричной decoder network. К выходу с последнего конволюционного слоя прибавляется гауссовский шум с нулевым матожидаением и настраиваемой дисперсией и затем к этому применяется линейный слой с ReLU активациями. Получают следующие фоточки:</p>
+<p><img src="../../post-images/kernel-implicit-variational-inference/figure4.png"></p>
+<p>Говорят, что их фоточки получаются более резкими, а также что в пространстве кодов получаются более гладкие переходы от фоточки одного типа к другой.</p>
+<h1 id="post-scriptum">Post Scriptum</h1>
+<p>В данной статье авторы по сути улучшили Ratio Estimation Trick и сделали вариционный вывод с implicit distribution в качестве вариационного приближения менее шумным. Также в плане экспериментов авторы, как по мне, провели очень большую работу, очень много различных экспериментов в основной статье, плюс объяснения и дополнительные эксперименты в Appendix’е. Они показали применимость метода в случае с вариационным выводом для локальных и для глобальных латентных переменных.</p>
+<p>Хотелось бы наверное посмотреть на сравнение с Hierarchical Implicit Models and Likelihood-Free Variational Inference (HIM), так как авторы говорят, что вот использование аналитического вида для log-ratio лучше, чем учить классификатор. С одной стороны, аналитическое решение является глобальным оптимумом соответствующей оптимизационной задачи, а с другой для классификатора в обычном Ratio Estimation Trick есть теорема, говорящая о том, что если классификатор достаточно хороший, то logit’ы классификатора будут равны log-ratio. Основное приемущество здесь по сравнению с HIM в том, что если моделируем глобальные скрытые переменные (веса сети например), то предложенная процедура более масштабируемая, чем в HIM’ах.</p>
+<p>В общем и целом вышло круто вроде как, я аж решил покодить мини эксперимент (тетрадку можно взять <del>у меня или у Артёма Соболева</del> <a href="https://gist.github.com/artsobolev/596c8049474e7958e53f847a6a4499b8">здесь</a>).</p>
+    </div>
+
+    <aside class="post-meta"><a class="post-author" href="../../authors/artiom-gadetskii/">Артём Гадецкий</a>
+    <time class="post-date published dt-published" datetime="2017-11-14T06:16:47+03:00" itemprop="datePublished" title="14 ноября 2017">14 ноября 2017</time></aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script></article>
+</div>
+    </div>
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+    
+    
+        <footer id="footer"><p>Contents © 2017         <a href="mailto:info@bayesgroup.ru">BayesGroup</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
+            
+        </footer><script src="../../assets/js/jquery.min.js"></script><script src="../../assets/js/moment-with-locales.min.js"></script><script src="../../assets/js/fancydates.js"></script><!-- fancy dates --><script>
+    moment.locale("ru");
+    fancydates(2, "DD.MM.YYYY");
+    </script><!-- end fancy dates -->
+</body>
+</html>
