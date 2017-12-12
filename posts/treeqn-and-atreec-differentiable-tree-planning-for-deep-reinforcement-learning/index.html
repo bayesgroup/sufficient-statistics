@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " vocab="http://ogp.me/ns" lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>TreeQN And ATreeC: Differentiable Tree Planning For Deep Reinforcement Learning | Codename 'Sufficient Statistics'</title>
+<link href="../../assets/css/rst.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/poole.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/lanyon.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/code.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/custom.css" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=PT+Serif:400,400italic,700%7CPT+Sans:400">
+<link rel="canonical" href="http://bayesgroup.github.io/sufficient-statistics/posts/treeqn-and-atreec-differentiable-tree-planning-for-deep-reinforcement-learning/">
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script><!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="Александр Фрицлер">
+<link rel="prev" href="../kernel-implicit-variational-inference/" title="Kernel Implicit Variational Inference" type="text/html">
+<meta property="og:site_name" content="Codename 'Sufficient Statistics'">
+<meta property="og:title" content="TreeQN And ATreeC: Differentiable Tree Planning For Deep Reinforcement">
+<meta property="og:url" content="http://bayesgroup.github.io/sufficient-statistics/posts/treeqn-and-atreec-differentiable-tree-planning-for-deep-reinforcement-learning/">
+<meta property="og:description" content="В данной статье авторы вводят алгоритмы обучения с подкреплением под названием TreeQN и ATreeC, которые авторы позиционируют как новый взгляд на планирование и его использование в сложных средах. Данн">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2017-12-02T09:01:23+03:00">
+<meta property="article:tag" content="mathjax">
+<meta property="article:tag" content="reinforcement learning">
+</head>
+<body>
+    <a href="#content" class="sr-only sr-only-focusable">Перейти к главному содержимому</a>
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+            styles, `#sidebar-checkbox` for behavior. -->
+    <input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox"><!-- Toggleable sidebar --><div class="sidebar" id="sidebar">
+        <div class="sidebar-item">
+            <p>Обзоры не являются официальной позицией группы и предназначены исключительно для внутреннего использования.</p>
+        </div>
+        
+    <nav id="menu" role="navigation" class="sidebar-nav"><a class="sidebar-nav-item" href="../../authors/">Авторы</a>
+        <a class="sidebar-nav-item" href="../../archive.html">Архив</a>
+        <a class="sidebar-nav-item" href="../../categories/">Тэги</a>
+    
+    
+    </nav>
+</div>
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+          
+    <h3 id="brand" class="masthead-title">
+      <a href="../../" title="Codename 'Sufficient Statistics'" rel="home">Codename 'Sufficient Statistics'</a>
+    </h3>
+
+
+        </div>
+      </div>
+
+      <div class="container content" id="content">
+        
+<article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><div class="paper-link">
+        <a href="https://arxiv.org/abs/1710.11417">Paper</a>
+    </div>
+    <header><h1 class="post-title p-name entry-title" itemprop="headline name"><a href="." class="u-url">TreeQN And ATreeC: Differentiable Tree Planning For Deep Reinforcement Learning</a></h1>
+
+        
+        <ul itemprop="keywords" class="tags">
+<li><a class="tag p-category" href="../../categories/reinforcement-learning/" rel="tag">reinforcement learning</a></li>
+        </ul></header><div class="e-content entry-content" itemprop="articleBody text">
+    <p>В данной статье авторы вводят алгоритмы обучения с подкреплением под названием TreeQN и ATreeC, которые авторы позиционируют как новый взгляд на планирование и его использование в сложных средах. Данная модель выделяется тем, что обучается одна модель end-to-end, и что она не обучается точно предсказывать следующее состояние. Также авторы сравнивают свои алгоритмы с аналогами (DQN и A3C) на средах Atari и в ещё одной простой игре.</p>
+<h1 id="background">Background</h1>
+<p>В обучении с подкреплением у нас есть марковский процесс принятия решений (MDP), состоящий из:</p>
+<ol type="1">
+<li>S – множество всех состояний (s)</li>
+<li>A – множество всех действий (a)</li>
+<li>R – функция награды (r), отображение декартового произведения множеств S и A на ось действительных чисел</li>
+<li>P – функция вероятности перехода из состояния s в s’ при совершении действия a</li>
+</ol>
+<p>Мы хотим на каждом шаге совершать такие действия, которые будут максимизировать функцию, называемую Return:</p>
+<p><span class="math display">\[G_t = r_t + \gamma r_{t+1} + \gamma^2 r_{t+2} + ... = \sum\limits_{t^{'}=t}^T \gamma^{(t^{'}-t)} r_{t^{'}}\]</span></p>
+<p>Понимать, какие действия лучше, а какие – хуже, мы будем с помощью (оптимальной) Q-функции, равной</p>
+<p><span class="math display">\[Q^*(s,a) = \mathbb E_{\tau}[G_t| a_t=a, s_t=s] = \mathbb E_{\tau}\left[\sum\limits_{t^{'}=t}^T \gamma^{(t^{'}-t)} r_{t^{'}} | a_t=a, s_t=s\right],\]</span></p>
+<p>где <span class="math inline">\(\tau\)</span> – траектория<a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a>. То есть Q-функция – это дисконтированная суммарная будущая награда при условии, что мы будем действовать оптимально. Жадный выбор действия с наибольшей Q(s, a) в каждом состоянии s и будет давать нам оптимальные действия.</p>
+<p>Предсказывая Q(s,a) любыи дифференцируемым аппроксиматором, мы обучаем его параметры с помощью следующей функции ошибки: <span class="math display">\[L(\theta) = \mathbb E_{(s_t, a_t, s_{t+1})}[(Q^{\theta}(s_t,a_t) - (r + \gamma \max_{a}Q^{\theta^-}(s_{t+1},a)))^2]\\\\\]</span></p>
+<p>Данный алгоритм с некоторыми модифицикациями носит название Deep-Q-Network (DQN), и в нём аппроксиматором выступает нейронная сеть.</p>
+<p>Advantage Actor-Critic (A2C) использует другой подход. Он максимизирует ожидаемую дисконтированную награду напрямую по параметрам политики:</p>
+<p><span class="math display">\[J(\pi) = \mathbb{E}_{\tau}\Big[\sum\limits_{t=0}^T \gamma^t r(s_t, a_t) \Big],\]</span></p>
+<p>при этом используется следующая формула для градиента (получается с помощью т.н. log-derivate trick’а)</p>
+<p><span class="math display">\[{\nabla_{\theta}} J(\pi) = \mathbb E_{\tau}\bigg[\sum_{t=0}^T \nabla_{\theta} \log\:\pi(a_t | s_t) \left(Q^{\pi}(s_t, a_t) - \mathbb E_{a_t\sim \pi}[Q^{\pi}(s_t, a_t)]\right)\bigg],\]</span> где мат. ожидание Q(s,a), также известное как V(s) или Value-функция, оценивается отдельно сетью, называемой Critic. <a href="#fn2" class="footnote-ref" id="fnref2"><sup>2</sup></a></p>
+<h1 id="planning">Planning</h1>
+<p>Планирование – это принятие решения, основанное на том, какие состояния мы будем встречать в будущем, а также на том, какие действия мы будем совершать. Ранее были опубликованы статьи с использованием различных методов планирования для решения задач обучения с подкреплением. Популярный пример – поиск по дереву методом Монте-Карло, который был использован в алгоритме <a href="https://www.nature.com/articles/nature24270">AlphaGo</a>. Однако, такой метод работает только в случаях, когда у нас в распоряжении имеется идеальная модель среды, что бывает далеко не всегда.</p>
+<p>Можно обучить нейронную сеть, которая будет предсказывать следующее состояние по текущему состоянию и действию (<a href="https://arxiv.org/abs/1704.02254">Recurrent Environment Simulators</a>), но, по словам авторов статьи, такие модели работают недостаточно хорошо, в том числе потому что предсказывают помимо важной информации ненужный шум, который содержится в среде.</p>
+<h1 id="treeqn">TreeQN</h1>
+<p>Авторы статьи вводят необычный способ планирования в рамках задач со сложной динамикой, внося следующие изменения в архитектуру: пусть вход последнего полносвязного слоя у DQN будет обознчаен как z. Теперь, вместо последнего полносвязного слоя в обычной DQN, в котором по z предсказываются Q-значения, сеть пытается предсказать значение z на следующем шаге, если совершит каждое из действий:</p>
+<p><span class="math display">\[ z_{t+1}^{a_i} = z_{t} + \tanh(W^{a_i}z_{t}) \]</span></p>
+<p>Также она предсказывает награду, которую получит агент на текущем шаге (здесь размерности таковы, что <span class="math inline">\(\hat{r}\)</span> – не скаляр, а вектор размерности количества действий):</p>
+<p><span class="math display">\[\hat{r}(z_{t}) = W^r_2 \text{ReLU}(W^r_1 z_{t} + b^r_1) + b^r_2\]</span></p>
+<p>Ещё есть отдельная голова, предсказывающая Value-функцию (на сей раз скалярная):</p>
+<p><span class="math display">\[V(z_{t}) = w_V^Tz_{t} + b_V \]</span></p>
+<h2 id="планирование">Планирование</h2>
+<ol type="1">
+<li><p>Модель получает состояние s, пропускает его через первые слои и получает значение z – внутреннее представление состояния, которое выучила нейронная сеть.</p></li>
+<li><p>К внутреннему состоянию d раз применяется описанная выше “transition function”, причём действия выбираются всевозможным образом, то есть совершается экспоненциальное количество (n^d, где n – количество действий) роллаутов. Каждый роллаут содержит последовательность внутренних представлений z и последовательность наград r.</p></li>
+<li><p>Далее происходит так называемый backup, информация о Q-значении поднимается от листьев к корню по следующему правилу: пусть мы находимся на глубине l и обновляем нашу информацию из потомков данной вершины: <span class="math display">\[
+\begin{align*}
+Q^l(z_{t+l}, a) &amp;= r(z_{t+l}, a_i) + \gamma  V^{(\lambda)}(z^a_{t+l+1}) \\
+V^{\lambda}(z_{t+l}) &amp;= 
+\begin{cases}
+V(z_{t+l}), &amp; l = d \\
+(1-\lambda) V(z_{t+l}) + \lambda \max_{a} Q^{l+1}(z^a_{t+l+1}, a), &amp; l &lt; d \\
+\end{cases}
+\end{align*}
+\]</span></p></li>
+</ol>
+<p>Где <span class="math inline">\(\lambda\)</span> - это параметр, отвечающий за то, насколько мы доверяем критику, а насколько – более глубокому поиску и информации оттуда, которую даёт наша модель.</p>
+<p>После того, как наши Q-значения в корне посчитаны, мы можем выбрать действие согласно <span class="math inline">\(\varepsilon\)</span>-жадной стратегии.</p>
+<p>Иллюстрация, которая дана в статье:</p>
+<p><img src="../../post-images/treeqn-and-atreec-differentiable-tree-planning-for-deep-reinforcement-learning/treeqn.png" class="big"></p>
+<p>Также мы добавляем к нашей функции ошибки помимо вышеописанной для DQN обычную средне-квадратичную ошибку предсказания награды: <span class="math display">\[L(\theta) = L_{DQN}(\theta) + \eta \mathbb{E}_\tau \left[\sum_{t=0}^T (\hat{r}^a(z_t) - r_{t})^2\right],\]</span></p>
+<p>где <span class="math inline">\(\eta\)</span> – гиперпараметр, не очень влияет (по словам авторов) на производительность модели.</p>
+<p>Всё описанное выше можно без труда обобщить на случай n-step DQN, когда для вычисления целевого значений Q(s,a) мы будем использовать реальные последующие состояния и награды на n шагов вперёд, а потом уже делать “симуляции”. Тогда мы сможем добавить к итоговой ошибке MSE предсказанной награды на каждом шаге.</p>
+<p>Важно заметить, что мы не минимизируем нашу ошибку прогноза z на следующем шаге! Авторы мотивируют это тем, что хотят, чтобы модель выучивала сама только то, что ей нужно для результата.</p>
+<h1 id="atreec">ATreeC</h1>
+<p>В данной модели ничего разительно отличающегося от предыдующей схемы здесь нет. По сути в самом вычислительном графе здесь отличие только в том, что вероятности действий пересчитываются согласно softmax-функции относительно предсказанных Q-значений (при этом, как известно, в обычном A2C/A3C никакие Q-значения не предсказываются). Для обучения используются все те же формулы, что и у A2C/A3C. Иллюстрация к модели в статье выглядит так:</p>
+<p><img src="../../post-images/treeqn-and-atreec-differentiable-tree-planning-for-deep-reinforcement-learning/atreec.png" class="medium"></p>
+<h1 id="experiments">Experiments</h1>
+<p>Авторы тестируют свои алгоритмы на 2 видах сред. Первой идёт среда, состоящая из сеточного мира, в котором требуется двигать ящики в заданные точки и избегать препятствий (все подробности в полной статье).</p>
+<p>Ниже приведены графики обучения всех алгоритмов и бэйзлайнов. Как видно из них, даже без симуляции будущего данные архитектуры работает лучше оригинальных A2C и DQN, это легко объясняется тем, что обучение предсказанию отдельно value-функции и награды повышает качество обучения. В случае с DQN дальнейшее увеличение глубины поиска даёт улучшение, в Actor-Critic такого не наблюдается.</p>
+<p><img src="../../post-images/treeqn-and-atreec-differentiable-tree-planning-for-deep-reinforcement-learning/boxscore.png" class="big"></p>
+<h2 id="atari">Atari</h2>
+<p>При обучении на нескольких играх Atari авторы получают следующие результаты: <img src="../../post-images/treeqn-and-atreec-differentiable-tree-planning-for-deep-reinforcement-learning/treeatari.png" class="big"></p>
+<p>Графики обучения TreeQN: <img src="../../post-images/treeqn-and-atreec-differentiable-tree-planning-for-deep-reinforcement-learning/treeqnres.png" class="big"></p>
+<p>Графики обучения ATreeC <img src="../../post-images/treeqn-and-atreec-differentiable-tree-planning-for-deep-reinforcement-learning/atreecres.png" class="big"></p>
+<h1 id="conclusion">Conclusion</h1>
+<p>Авторы ввели новые архитектуры TreeQN и ATreeC, основанные на end-to-end дифференцируемом планировании, и показали, как оно используется для предсказания Q-значений</p>
+<h2 id="my-humble-opinion">My humble opinion</h2>
+<p>Кажется, планированием это можно назвать только в кавычках, потому что ничто не заставляет нейронную сеть правильно предсказывать то, что будет далее. Авторы говорят, что мы так позволяем нашей нейронной сети выучить предсказывать только ту информацию о будущем, которая ей полезна в дальнейшем, но ничто не гарантирует то, что нейронная сеть будет заниматься каким бы то ни было предсказанием будущего в принципе.</p>
+<p>В статье нет хороших примеров работы сети, когда видно, что сеть предсказывает какие-то события с большой наградой на следующих шагах. (точнее, 1 пример есть, но он не совсем корректный, потому что действие, которое приводит к награде через 1 шаг, можно совершить и на данном шаге). Вполне вероятно, что сеть таким образом просто выучивает какое-то более удобное внутреннее представление, с помощью которого Critic лучше предсказывает Value-function, отсюда и небольшое улучшение производительности (и то только в TreeQN, в ATreeC добавление планирования не даёт значимого улучшения в среднем). Авторы обещают придумать, как сделать модель более интерпретируемой и как сделать планирование более глубоким. Интересно, получится ли у них это сделать, будем наблюдать.</p>
+<section class="footnotes"><hr>
+<ol>
+<li id="fn1"><p>Траектория – это последовательность вида <span class="math inline">\((s_0, a_0, s_1, a_1, \dots, s_{T}, a_{T})\)</span>, получаемая следующим образом: начальное состояние <span class="math inline">\(s_0\)</span> генерируется из некоторого распределения над начальными конфигурациями <span class="math inline">\(p(s_0)\)</span>, на каждом шаге агент семплирует действие из политики <span class="math inline">\(\pi(a_t|s_t)\)</span>, в ответ на что среда переходит в случайное состояние из <span class="math inline">\(p(s_{t+1}|a_t, s_t)\)</span>.<br><br>Все распределения могут быть вырожденными, что приведёт к детерминированным эффектам. Надо заметить, что если политика детерминирована и дискретна, то мы получаем задачу дискретной оптимизации, которую мы не очень-то умеем решать.<a href="#fnref1" class="footnote-back">↩</a></p></li>
+<li id="fn2"><p>Саму Q(s, a) можно либо оценивать по семплам (просто дисконтированно просуммировать награды до конца эпизода, это будет Monte Carlo оценка настоящей функции Q(s, a)), либо оценить с помощью нейросети. В последнем случае градиент будет смещённым, зато дисперсия (fingers crossed) будет поменьше.<a href="#fnref2" class="footnote-back">↩</a></p></li>
+</ol></section>
+</div>
+
+    <aside class="post-meta"><a class="post-author" href="../../authors/aleksandr-fritsler/">Александр Фрицлер</a>
+    <time class="post-date published dt-published" datetime="2017-12-02T09:01:23+03:00" itemprop="datePublished" title="02 декабря 2017">02 декабря 2017</time></aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script></article>
+</div>
+    </div>
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+    
+    
+        <footer id="footer"><p>Contents © 2017         <a href="mailto:info@bayesgroup.ru">BayesGroup</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
+            
+        </footer><script src="../../assets/js/jquery.min.js"></script><script src="../../assets/js/moment-with-locales.min.js"></script><script src="../../assets/js/fancydates.js"></script><!-- fancy dates --><script>
+    moment.locale("ru");
+    fancydates(2, "DD.MM.YYYY");
+    </script><!-- end fancy dates -->
+</body>
+</html>
