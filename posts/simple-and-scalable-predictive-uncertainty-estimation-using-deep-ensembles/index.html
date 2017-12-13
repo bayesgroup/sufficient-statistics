@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " vocab="http://ogp.me/ns" lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>Simple and Scalable Predictive Uncertainty Estimation using Deep Ensembles | Codename 'Sufficient Statistics'</title>
+<link href="../../assets/css/rst.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/poole.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/lanyon.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/code.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/custom.css" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=PT+Serif:400,400italic,700%7CPT+Sans:400">
+<link rel="canonical" href="http://bayesgroup.github.io/sufficient-statistics/posts/simple-and-scalable-predictive-uncertainty-estimation-using-deep-ensembles/">
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script><!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="Андрей Атанов">
+<link rel="prev" href="../kernel-implicit-variational-inference/" title="Kernel Implicit Variational Inference" type="text/html">
+<link rel="next" href="../treeqn-and-atreec-differentiable-tree-planning-for-deep-reinforcement-learning/" title="TreeQN And ATreeC: Differentiable Tree Planning For Deep Reinforcement Learning" type="text/html">
+<meta property="og:site_name" content="Codename 'Sufficient Statistics'">
+<meta property="og:title" content="Simple and Scalable Predictive Uncertainty Estimation using Deep Ensem">
+<meta property="og:url" content="http://bayesgroup.github.io/sufficient-statistics/posts/simple-and-scalable-predictive-uncertainty-estimation-using-deep-ensembles/">
+<meta property="og:description" content="Если кратко, то ребята из гугла предложили простой в применении и эффективный на практике метод для оценки uncertainty для нейронных сетей. Математики в данной статье по минимуму, много экспериментов ">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2017-11-26T12:50:24+03:00">
+<meta property="article:tag" content="deep learning">
+<meta property="article:tag" content="mathjax">
+<meta property="article:tag" content="uncertainty">
+</head>
+<body>
+    <a href="#content" class="sr-only sr-only-focusable">Перейти к главному содержимому</a>
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+            styles, `#sidebar-checkbox` for behavior. -->
+    <input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox"><!-- Toggleable sidebar --><div class="sidebar" id="sidebar">
+        <div class="sidebar-item">
+            <p>Обзоры не являются официальной позицией группы и предназначены исключительно для внутреннего использования.</p>
+        </div>
+        
+    <nav id="menu" role="navigation" class="sidebar-nav"><a class="sidebar-nav-item" href="../../authors/">Авторы</a>
+        <a class="sidebar-nav-item" href="../../archive.html">Архив</a>
+        <a class="sidebar-nav-item" href="../../categories/">Тэги</a>
+    
+    
+    </nav>
+</div>
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+          
+    <h3 id="brand" class="masthead-title">
+      <a href="../../" title="Codename 'Sufficient Statistics'" rel="home">Codename 'Sufficient Statistics'</a>
+    </h3>
+
+
+        </div>
+      </div>
+
+      <div class="container content" id="content">
+        
+<article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><div class="paper-link">
+        <a href="https://arxiv.org/abs/1612.01474">Paper</a>
+    </div>
+    <header><h1 class="post-title p-name entry-title" itemprop="headline name"><a href="." class="u-url">Simple and Scalable Predictive Uncertainty Estimation using Deep Ensembles</a></h1>
+
+        
+        <ul itemprop="keywords" class="tags">
+<li><a class="tag p-category" href="../../categories/deep-learning/" rel="tag">deep learning</a></li>
+            <li><a class="tag p-category" href="../../categories/uncertainty/" rel="tag">uncertainty</a></li>
+        </ul></header><div class="e-content entry-content" itemprop="articleBody text">
+    <p>Если кратко, то ребята из гугла предложили простой в применении и эффективный на практике метод для оценки uncertainty для нейронных сетей. Математики в данной статье по минимуму, много экспериментов и сравнений, поэтому будет много картиночек и почти не будет формул.</p>
+<p>Идея метода крайне проста — использвать ансамбль нейронных сетей (не Байесовских! O_o), которые предсказывают не ответ а распределение (нормальное для регрессии и категориальное для классификации).</p>
+<h1 id="рецепт">Рецепт</h1>
+<p>Авторы предлагают следующие ингредиенты для обучения ‘’Глубинного Ансамбля’’:</p>
+<ol type="1">
+<li>Использовать в качестве лосс-функции <em>proper scoring rule</em> <span class="math inline">\(S(p_{\theta}, (x, y))\)</span>. Должно обладать следующим свойством: <span class="math display">\[ \mathcal{S}(p_{\theta}, q) = \mathbb{E}_{q} S(p_{\theta}, (x, y)) \leq \mathbb{E}_{q} S(q, (x, y)) = \mathcal{S}(q, q) , \, \forall p_{\theta} \neq q \]</span> где <span class="math inline">\(q\)</span> – истинное распределение на парах <span class="math inline">\((x, y)\)</span>. Таким свойством, например, обладает <em>negative log likelihood</em> для регрессии и кросс-энтропия для классификации.</li>
+<li>Использовать <em>adversarial training</em> для увеличения робастности сети и дата-аугментации. В частности, они предлагают на каждом шаге для каждого объекта использовать <em>fast gradient sign method</em> и минимизировать суммарный лосс на обоих объектах: <span class="math display">\[ x' = x + \varepsilon \cdot \text{sign}(\nabla_x l(\theta, x, y))\]</span>
+</li>
+<li>Использоват ансамбль нейронных сетей. Это, как мне кажется, одна из самых забавных вещей, потому что они предлагают формировать ансамбль из моделей, которые обучались из разных начальных приближений. Мотивация крайне проста — оптимизируемый функционал многомодален, поэтому модели скатятся в разные локальные минимумы.</li>
+</ol>
+<p>Ансамблирование в задаче классификации происходит просто усреднением вероятностей соответствующих классов. В задаче регрессии же получется смесь нормальных распределение, авторы предлагают аналитически посчитать среднее и дисперсию и использовать только их. Однако, в своих результатах они приводят результаты для небольшого количества сетей (максимум 15), поэтому можно и напрямую оперировать смесью.</p>
+<p>Во всех экспериментах для регрессии авторы используют в качестве лосса NLL:</p>
+<p><span class="math display">\[ -\log p_{\theta}(y|x) = \dfrac{\log \sigma_{\theta}^2(x)}{2} + \dfrac{(y - \mu_{\theta}(x))^2}{2 \sigma_{\theta}^2(x)} + const \]</span></p>
+<h1 id="эксперименты">Эксперименты</h1>
+<h2 id="sampled-variance-vs-estimated">Sampled variance VS Estimated</h2>
+<p><img src="../../post-images/simple-and-scalable-predictive-uncertainty-estimation-using-deep-ensembles/toy.png" class="big"></p>
+<p>Видно, что ансамбль, обученный просто на MSE, не дает хорошей оценки неопределённости. Что в целом ясно, потому что MSE этого не учитывает, в отличии от NLL. Вот к примеру распределение, оцененное с помощью HMC, которое, думаю, можно рассматривать как истинное. (обратите внимание, что масштаб разный)</p>
+<p><img src="../../post-images/simple-and-scalable-predictive-uncertainty-estimation-using-deep-ensembles/toy-gt.png" class="small"></p>
+<p>Тоже интересный эффект от использования NLL вместо MSE (который почему-то убрали в последней ревизии):</p>
+<p><img src="../../post-images/simple-and-scalable-predictive-uncertainty-estimation-using-deep-ensembles/toy-mod.png" class="medium"></p>
+<p>Как видно, ансамбль обученный на NLL воспринимает синисоиду в окрестности нуля за шум, в отличии от ансамбля обученного на MSE, который достаточно точно проходит по всем точкам. Однако понятно, что полезность такого эффекта зависит от конкретной задачи.</p>
+<h2 id="классификация">Классификация</h2>
+<p>Авторы также представили сравниение качества модели и uncertainty для задач классификации на MNIST и SVHN (странно, что нет CIFAR10, наверное не взлетело).</p>
+<p><img src="../../post-images/simple-and-scalable-predictive-uncertainty-estimation-using-deep-ensembles/classification-mnist.png" class="medium"></p>
+<p><img src="../../post-images/simple-and-scalable-predictive-uncertainty-estimation-using-deep-ensembles/classification-svhn.png" class="medium"></p>
+<p>На представленных датасетах модель лучше MC Dropout по качеству и оценке неопределённости. В <em>Ensemble + R</em> для построения adversarial примера использовалось случайное направление, а не градиент функции потерь, таким образом можно выделить эффект adversarial training.</p>
+<p>Также авторы представили результаты на ImageNet, модель <em>inception</em>:</p>
+<p><img src="../../post-images/simple-and-scalable-predictive-uncertainty-estimation-using-deep-ensembles/imagenet.png" class="medium"></p>
+<p>Довольно странно, что нет сравнениея с MC Dropout, ведь в данной модели он есть.</p>
+<h2 id="неопределённость-на-незнакомых-данных">Неопределённость на незнакомых данных</h2>
+<p>Предыдущие метрики NLL и Brier score показывают, насколько сеть уверена в правильном ответе и насколько она уверена в неправильном для данных из “одного распределения”. Другим важным показателем является уверенность модели в объектах “далеких” от обучающей выборки. Для этого авторы обучают модель на одном датасете и измеряют энтропию предсказания на другом. (Подписи – “датасет на котором обучались – датасет на котором тестировали”).</p>
+<p><img src="../../post-images/simple-and-scalable-predictive-uncertainty-estimation-using-deep-ensembles/uncertainty-mnist.png" class="big"></p>
+<p><img src="../../post-images/simple-and-scalable-predictive-uncertainty-estimation-using-deep-ensembles/uncertainty-svhn.png" class="big"></p>
+<p>Видно, что одна сеть сильно уверена в ошибочном ответе. Ансамблирования сильно помогает исправить данную ситуацию и по высокой энтропии предсказания можно понять, что модель не может сделать хорошего предсказания. В обоих примерах визуально модель DeepEnsembles показывает себя лучше чем MC Dropout.</p>
+<p>Следующий эксперимент показывает практическую пользу полученой оценки на uncertainty. Авторы объединили датасеты MNIST и NotMNIST и считали долю правильных ответов на объектах для которых вероятность самого вероятного класса больше порога <span class="math inline">\(\tau\)</span>.</p>
+<p><img src="../../post-images/simple-and-scalable-predictive-uncertainty-estimation-using-deep-ensembles/acc-conf.png" class="big"></p>
+<p>Как видно, MC Dropout оказывается сильно уверен во многих неверных своих ответах, в то время как DeepEnsembles оказывается более робастной моделью. Однако, этому эксперименту не хватает графика доли объектов каждого из датасетов, на которых модель выдает ответ с увереностью больше порога. Без них достаточно сложно интерпретировать результаты, хотя кажутся они впечатляющими.</p>
+<h1 id="резюме">Резюме</h1>
+<p>Очень интересные результаты для такой простой техники. Стоит, однако, помнить, что если в случае дропаута “разные” сети получаются применением масок, то здесь приходится хранить все модели. Хоть экспериментов в статье приведено достаточно много, хотелось бы еще более детального обзора. Например везде берется небольшое количесвто моделей, однако интересно, возможно ли достичь такого же результата с большим числом моделей для MC Dropout (хотя судя по графикам они выходят на асимптоту, так что нет) и если да, то скольким.</p>
+<p>Так же не хватает экспериментов с другими моделями приближения байесовского вывода, так например для VI в Multiplicative Normalizing Flows for Variational Bayesian Neural Networks некоторые методы (фактически выбор вариационного распределения) показывают лучшее качество на некоторых задачах (рассмотренных и в этой статье).</p>
+    </div>
+
+    <aside class="post-meta"><a class="post-author" href="../../authors/andrei-atanov/">Андрей Атанов</a>
+    <time class="post-date published dt-published" datetime="2017-11-26T12:50:24+03:00" itemprop="datePublished" title="26 ноября 2017">26 ноября 2017</time></aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script></article>
+</div>
+    </div>
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+    
+    
+        <footer id="footer"><p>Contents © 2017         <a href="mailto:info@bayesgroup.ru">BayesGroup</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
+            
+        </footer><script src="../../assets/js/jquery.min.js"></script><script src="../../assets/js/moment-with-locales.min.js"></script><script src="../../assets/js/fancydates.js"></script><!-- fancy dates --><script>
+    moment.locale("ru");
+    fancydates(2, "DD.MM.YYYY");
+    </script><!-- end fancy dates -->
+</body>
+</html>
