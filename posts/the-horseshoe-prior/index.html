@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " vocab="http://ogp.me/ns" lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>The Horseshoe Prior | Codename 'Sufficient Statistics'</title>
+<link href="../../assets/css/rst.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/poole.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/lanyon.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/code.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/custom.css" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=PT+Serif:400,400italic,700%7CPT+Sans:400">
+<link rel="canonical" href="http://bayesgroup.github.io/sufficient-statistics/posts/the-horseshoe-prior/">
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script><!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="Максим Кочуров">
+<link rel="prev" href="../learning-texture-manifolds-with-the-periodic-spatial-gan/" title="Learning Texture Manifolds with the Periodic Spatial GAN" type="text/html">
+<meta property="og:site_name" content="Codename 'Sufficient Statistics'">
+<meta property="og:title" content="The Horseshoe Prior">
+<meta property="og:url" content="http://bayesgroup.github.io/sufficient-statistics/posts/the-horseshoe-prior/">
+<meta property="og:description" content="Статьи, которые будут затронуты в этой заметке:
+
+Bayesian Compression for Deep Learning
+Model Selection in Bayesian Neural Networks via Horseshoe Priors
+
+Прежде всего хочется обратить внимание на то, ">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2017-12-13T20:56:03+03:00">
+<meta property="article:tag" content="mathjax">
+<meta property="article:tag" content="probabilistic modeling">
+</head>
+<body>
+    <a href="#content" class="sr-only sr-only-focusable">Перейти к главному содержимому</a>
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+            styles, `#sidebar-checkbox` for behavior. -->
+    <input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox"><!-- Toggleable sidebar --><div class="sidebar" id="sidebar">
+        <div class="sidebar-item">
+            <p>Обзоры не являются официальной позицией группы и предназначены исключительно для внутреннего использования.</p>
+        </div>
+        
+    <nav id="menu" role="navigation" class="sidebar-nav"><a class="sidebar-nav-item" href="../../authors/">Авторы</a>
+        <a class="sidebar-nav-item" href="../../archive.html">Архив</a>
+        <a class="sidebar-nav-item" href="../../categories/">Тэги</a>
+    
+    
+    </nav>
+</div>
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+          
+    <h3 id="brand" class="masthead-title">
+      <a href="../../" title="Codename 'Sufficient Statistics'" rel="home">Codename 'Sufficient Statistics'</a>
+    </h3>
+
+
+        </div>
+      </div>
+
+      <div class="container content" id="content">
+        
+<article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><header><h1 class="post-title p-name entry-title" itemprop="headline name"><a href="." class="u-url">The Horseshoe Prior</a></h1>
+
+        
+        <ul itemprop="keywords" class="tags">
+<li><a class="tag p-category" href="../../categories/probabilistic-modeling/" rel="tag">probabilistic modeling</a></li>
+        </ul></header><div class="e-content entry-content" itemprop="articleBody text">
+    <p>Статьи, которые будут затронуты в этой заметке:</p>
+<ol type="1">
+<li><a href="https://arxiv.org/abs/1705.08665">Bayesian Compression for Deep Learning</a></li>
+<li><a href="https://arxiv.org/abs/1705.10388">Model Selection in Bayesian Neural Networks via Horseshoe Priors</a></li>
+</ol>
+<p>Прежде всего хочется обратить внимание на то, что вопрос об априорных распределениях для нейронных сетей очень плохо раскрыт. Стандартный приор - это нормальное распределение <span class="math inline">\(\mathcal{N}(0, 1)\)</span>. Однако такое распределение плохо работает, когда параметров модели очень много. Для того, чтобы учесть это априорное знание об избыточности модели, необходим приор, который спарсит решение, поощряет нулевые решения, распределения, концентрированные в нуле.</p>
+<h1 id="смеси-гауссиан">Смеси Гауссиан</h1>
+<p>Распределение Horseshoe является бесконечной смесью нормальных распределений с разными параметрами стандартного отклонения. При этом смесь устроена особым образом.</p>
+<p><span class="math display">\[
+\begin{align}
+    w|z &amp;\sim \mathcal{N}(0, z^2) \\
+    z &amp;\sim p(z) \\
+    p(w) &amp;= \int p(w|z)p(z)dz
+\end{align}
+\]</span></p>
+<p>Выбор <span class="math inline">\(p(z)\)</span> будет давать совершенно различные маржинальные распределения для <span class="math inline">\(p(w)\)</span>. Так, например, выбор <span class="math inline">\(p(z^2) = Exp(\lambda)\)</span> приведет к распределению лапласа для <span class="math inline">\(p(w)\)</span>, такой выбор приора известен как Лассо. Но это распределение подавляет не только слабые сигналы, но и информативные, что не является хорошим свойством.</p>
+<p>Если же взять распределение Half Cauchy (с параметром <span class="math inline">\(\tau\)</span>) для <span class="math inline">\(p(z)\)</span>, то мы получим распределение Horseshoe на <span class="math inline">\(p(w)\)</span>. Название не случайно и оно не привязано к конкретному выбору <span class="math inline">\(p(z)\)</span>. Принципиальным будет соблюдение свойства, описанного ниже.</p>
+<h2 id="почему-horseshoe">Почему Horseshoe?</h2>
+<p>Название переводится как “подкова”. Оно пришло из эконометрики, где этот приор использовался для коэффициентов линейной модели. Лассо, Гребневые (Ridge) регрессии использовались для регуляризации коэффициентов, чтобы уменьшить дисперсию оценки, при этом возникало смещение от матожидания оценки методом максимального правдоподобия. Величину этого смещения можно оценить при некоторых предпосылках.</p>
+<p><img src="../../post-images/the-horseshoe-prior/image0.png" class="medium"></p>
+<p>Если рассматривать сам коэффициент “смещения”, как случайную величину, то получим другой график где можно разглядеть форму подковы. Отсюда и название.</p>
+<p><img src="../../post-images/the-horseshoe-prior/image2.png"></p>
+<h1 id="вероятностная-модель">Вероятностная модель</h1>
+<p><img src="../../post-images/the-horseshoe-prior/image1.png"></p>
+<p>Для достижения групповой спарсити сделана модификация распределения и смесь берется иначе. Выглядит это так: <span class="math display">\[
+\begin{align}
+w_{ij} | z_i, s &amp;\sim \mathcal{N}(0, z_i^2 s^2)\\
+         z_i    &amp;\sim C^+(0, 1) \\
+         s      &amp;\sim C^+(0, \tau_0)
+\end{align}
+\]</span> В данной параметризации есть два источника спарсити. Первый, создаваемый <span class="math inline">\(z_i\)</span> направлен на каналы/нейроны в зависимости от того, где используется. Второй источник <span class="math inline">\(s\)</span> направлен сразу на все веса. Параметр <span class="math inline">\(\tau_0\)</span> характеризует интенсивность спарсификации всей модели. Меньшие значения соответствуют более разреженной модели. Обычно <span class="math inline">\(s\)</span> больше сконцентрирована в нуле, чем <span class="math inline">\(z_i\)</span>, если сигнал информативен, то <span class="math inline">\(z_i\)</span> компенсирует <span class="math inline">\(s\)</span> и наоборот. Это можно увидеть на графике выше, аналогичная параметризация априорных распределений используется в статье [<a href="https://arxiv.org/abs/1705.08665">1</a>].</p>
+<p>Рассмотрим различные подходы для вывода в этой модели. Все они основаны на разложении распределения Half Cauchy в более простые, но вовлекающие вспомогательные распределения.</p>
+<h2 id="invgammainvgamma">InvGamma+InvGamma</h2>
+<p>Распределение Half Cauchy можно представить как сложную случайную величину, количество латентных переменных увеличивается</p>
+<p><span class="math display">\[
+\begin{align}
+a \sim C^+(0, b) \: \Leftrightarrow \; a|\lambda &amp;\sim \mathcal{IG}(\frac{1}{2}, \frac{1}{\lambda}) \\
+                                         \lambda &amp;\sim \mathcal{IG}(\frac{1}{2}, \frac{1}{b^2}) 
+\end{align}
+\]</span> Предложенная в работе [<a href="https://arxiv.org/abs/1705.10388">2</a>] параметризация довольна экзотична. Она подразумевает иерархичность разложения распределения HalfCauchy. Авторы утверждают, что исходная вероятностная модель плохо подходит для варвывода из-за non-Centered параметризации и предлагают альтернативу. Почитать, почему это плохо, можно <a href="http://twiecki.github.io/blog/2017/02/08/bayesian-hierchical-non-centered/">здесь</a>. У самих же авторов non-centered параметризация работала лучше.</p>
+<p><img src="../../post-images/the-horseshoe-prior/image3.png"></p>
+<p>Соблюдая нотацию данной статьи запишем, как выглядит модель одного единственного слоя в случае non-centered параметризации. <span class="math display">\[
+\begin{align}
+\log p(\beta, \tau, \lambda, v, \nu)    &amp;= \sum_{i, j} \mathcal{N}(\beta_{ij}|0,I)\\
+                                        &amp;+ \sum_{i} \underbrace{
+                                            \mathcal{IG}(\tau_i|\frac{1}{2}, \lambda_i)
+                                            + \mathcal{IG}(\lambda_i| \frac{1}{2}, \frac{1}{b_0^2})
+                                         }_{\tau_i \sim C^+(0, b_0)\; \text{# local/group sparsity}}\\
+                                        &amp;+ \underbrace{
+                                            \mathcal{IG}(v|\frac{1}{2}, \nu)
+                                            + \mathcal{IG}(\nu| \frac{1}{2}, \frac{1}{b_g^2})
+                                         }_{v \sim C^+(0, b_g)\; \text{# global/layer sparsity}}
+\end{align}
+\]</span> В качестве апостериорного распределение выбирается факторизованное по всем переменным, причем используются следующие семейства <span class="math display">\[
+\begin{align}
+q(\beta_{ij})   &amp;= \mathcal{N}(\beta_{ij}| \mu_{ij}, \sigma^2_{ij})\quad        &amp;\text{Gaussian family}\\
+q(\tau_i)       &amp;= \mathcal{LN}(\tau_i| \mu_{\tau_{i}}, \sigma^2_{\tau_{i}})    &amp;\text{Log Normal family}\\
+q(\lambda_i)    &amp;= \mathcal{IG}(\lambda_i| c_{\lambda_i}, d_{\lambda_i})        &amp;\text{Inverse Gamma, closed form update}\\
+q(v)            &amp;= \mathcal{LN}(v| \mu_{v}, \sigma^2_{v})                       &amp;\text{Log Normal family}\\
+q(\nu)          &amp;= \mathcal{IG}(\nu| c_{\nu}, d_{\nu})                          &amp;\text{Inverse Gamma, closed form update}\\
+\phi            &amp;=\{\mu,\sigma, \mu_{\tau}, \sigma_{\tau}, \mu_{v}, \sigma_{v}\}&amp;
+\end{align}
+\]</span> Для вывода используется вариационное приближение и использование fixed point updates путем выведения маргинального распределения на вспомогательные переменные (<span class="math inline">\(\lambda_i\)</span>, <span class="math inline">\(\nu\)</span>) аналитически. Дополнительно стоит отметить факт, что авторы используют Black Box VI для градиентной итерации по <span class="math inline">\(\phi\)</span>. При этом не используется KL дивергенция <span class="math inline">\(KL(\mathcal{LN}||\mathcal{IG})\)</span>, хотя авторы конкурирующей статьи ее выводят. Что касается параметров <span class="math inline">\(\{c_{\lambda}, d_{\lambda}, c_{\nu}, d_{\nu}\}\)</span>, для них выводится маргинальное апостериорное в явном виде в шаге с fixed point update, показано, что это будет Inverse Gamma распределение.</p>
+<h2 id="gammainvgamma">Gamma+InvGamma</h2>
+<p>Такая параметризация предложена в работе [<a href="https://arxiv.org/abs/1705.08665">1</a>], выглядит проще, хотя ее преимущество перед первым вариантом не очевидно, хоты бы потому, что в первом случае считалось меньшее количество градиентов, меньше сэмплирования и тд. Распределение Half Cauchy раскладывается в произведение корней двух случайных величин:</p>
+<p><span class="math display">\[
+\begin{align}
+    z \sim C^+(0, \tau) \;\Leftrightarrow \;\;  &amp; z_a \sim \mathcal{G}(0.5, \tau^2) \\
+                                                &amp; z_b \sim \mathcal{IG}(0.5, 1) \\
+                                                &amp; z = \sqrt{z_a z_b}
+\end{align}
+\]</span> Модель для вывода выбирается тоже non-centered, при этом нету сравнений с centered параметризацией. <span class="math display">\[
+\begin{align}
+    \tilde{W}_{ij} &amp; \sim \mathcal{N}(0, 1) \\
+               z_i &amp; = \sqrt{z_{a_i} z_{b_i}}   &amp;z_{a_i} \sim \mathcal{G}(0.5, \tau^2_z) \quad&amp; z_{b_i} \sim \mathcal{IG}(0.5, 1)\\
+               s   &amp; = \sqrt{s_a s_b}           &amp; s_a \sim \mathcal{G}(0.5, \tau^2_s) \quad&amp; s_b \sim \mathcal{IG}(0.5, 1)\\
+          W_{ij}   &amp; = \tilde{W}_{ij}z_i s
+\end{align}
+\]</span></p>
+<p>В нотации этой работы <span class="math inline">\(z\)</span> - латентная переменная которая поощряет локальную разреженность (выкидывание нейронов), <span class="math inline">\(s\)</span> поощряет разреженность в слое. Выбор апостериорных аппроксимаций не случаен, все для удобной KL дивергенции.</p>
+<p><span class="math display">\[
+\begin{align}
+    q(W) &amp;= \mathcal{N}(M_w, \Sigma_w) &amp; \\
+    q(z_a) &amp;= \mathcal{LN}(\mu_{z_a}, \sigma_{z_a}) &amp;\quad q(z_b) = \mathcal{LN}(\mu_{z_b}, \sigma_{z_b}) \\
+    q(s_a) &amp;= \mathcal{LN}(\mu_{s_a}, \sigma_{s_a}) &amp;\quad q(s_b) = \mathcal{LN}(\mu_{s_b}, \sigma_{s_b})
+\end{align}
+\]</span></p>
+<p>Варвывод в этой статье более простой за счет явного вывода <span class="math inline">\(KL(\mathcal{LN}||\mathcal{G})\)</span>, <span class="math inline">\(KL(\mathcal{LN}||\mathcal{IG})\)</span>. Более подробно это рассмотрен в статье</p>
+<h1 id="схожие-работы">Схожие работы</h1>
+<h2 id="sparsity">Sparsity</h2>
+<ol type="1">
+<li><p><a href="https://arxiv.org/abs/1701.05369">Log Uniform</a> prior. Вводится логнормальное априорное распределение на параметры. Апостериорное распределение характеризуется гауссовским дропаутом с аддитивной параметризацией. <span class="math display">\[
+\begin{align}
+p(w_{ij}) &amp;\propto \frac{1}{|w_{ij}|}\\
+q(w_{ij}) &amp;= \mathcal{N}(w_{ij}| \theta_{ij}, \alpha_{ij}\theta_{ij}^2)
+\end{align}
+\]</span> Помимо этого аппроксимирована ненормализованная <span class="math inline">\(KL(q||p)\)</span>, что позволяет эффективно обучать большие сети с небольшой дисперсией градиента.</p></li>
+<li><p><a href="https://www2.stat.duke.edu/courses/Fall05/sta395/joelucas1.pdf">Spike and Slab</a> prior. Априорное распределение представляет собой смесь дельта функции и нормального распределения.</p></li>
+</ol>
+<p><span class="math display">\[
+p(w_{ij}) = \delta_0(w_{ij})\pi + (1-\pi)\mathcal{N}(w_{ij}| 0, 1)
+\]</span></p>
+<h2 id="group-sparsity">Group Sparsity</h2>
+<ol type="1">
+<li><p><a href="https://papers.nips.cc/paper/1976-adaptive-sparseness-using-jeffreys-prior.pdf">Normal Jeffreys</a> prior. Априорное распределение очень связанное с Log Uniform, но позволяющее делать групповое спарсити. <span class="math display">\[
+p(W, z) \propto \prod_i^A \frac{1}{|z_i|}\prod_{i,j}^{A, B}\mathcal{N}(w_{ij}|z_i\mu_{ij}, z_i^2\sigma_{ij}^2)
+\]</span></p></li>
+<li><p><a href="https://arxiv.org/abs/1705.07283">Truncated Log Uniform</a> prior. В этой работе основная идея - контролировать связи между слоями с помощью мультипликативного шума. Априорным распределением на шум является truncated Log Uniform, апостериорным truncated Log Normal (априорное распределение в этом случае tractable). Сами веса остаются свободными параметрами. По сути это работает как альтернатива дропаут слою. Групповое спарсити достигается за счет структуры мультипликативного шума.</p></li>
+</ol>
+<h1 id="саммари">Саммари</h1>
+<table>
+<thead><tr class="header">
+<th>prior</th>
+<th>tractable</th>
+<th>grouped version</th>
+<th>within layer</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>LogUniform</td>
+<td>no</td>
+<td>no</td>
+<td>yes</td>
+</tr>
+<tr class="even">
+<td>Spike&amp;Slab</td>
+<td>yes</td>
+<td>no</td>
+<td>yes</td>
+</tr>
+<tr class="odd">
+<td>Normal Jeffreys</td>
+<td>no</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr class="even">
+<td>Tr. Log Uniform</td>
+<td>yes</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+<tr class="odd">
+<td>Horseshoe</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+</tbody>
+</table>
+<p>Этот обзор, конечно, не претендует на исчерпывающий, но хорошо показывает место Horseshoe среди других аналогичных подходов.</p>
+    </div>
+
+    <aside class="post-meta"><a class="post-author" href="../../authors/maksim-kochurov/">Максим Кочуров</a>
+    <time class="post-date published dt-published" datetime="2017-12-13T20:56:03+03:00" itemprop="datePublished" title="13 декабря 2017">13 декабря 2017</time></aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script></article>
+</div>
+    </div>
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+    
+    
+        <footer id="footer"><p>Contents © 2017         <a href="mailto:info@bayesgroup.ru">BayesGroup</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
+            
+        </footer><script src="../../assets/js/jquery.min.js"></script><script src="../../assets/js/moment-with-locales.min.js"></script><script src="../../assets/js/fancydates.js"></script><!-- fancy dates --><script>
+    moment.locale("ru");
+    fancydates(2, "DD.MM.YYYY");
+    </script><!-- end fancy dates -->
+</body>
+</html>
