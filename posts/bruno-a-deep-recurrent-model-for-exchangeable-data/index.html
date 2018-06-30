@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " vocab="http://ogp.me/ns" lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>BRUNO: A Deep Recurrent Model for Exchangeable Data | Codename 'Sufficient Statistics'</title>
+<link href="../../assets/css/rst.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/poole.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/lanyon.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/code.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/custom.css" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=PT+Serif:400,400italic,700%7CPT+Sans:400">
+<link rel="canonical" href="http://bayesgroup.github.io/sufficient-statistics/posts/bruno-a-deep-recurrent-model-for-exchangeable-data/">
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script><!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="Артём Соболев">
+<link rel="prev" href="../not-all-samples-are-created-equal-deep-learning-with-importance-sampling/" title="Not All Samples Are Created Equal: Deep Learning with Importance Sampling" type="text/html">
+<meta property="og:site_name" content="Codename 'Sufficient Statistics'">
+<meta property="og:title" content="BRUNO: A Deep Recurrent Model for Exchangeable Data">
+<meta property="og:url" content="http://bayesgroup.github.io/sufficient-statistics/posts/bruno-a-deep-recurrent-model-for-exchangeable-data/">
+<meta property="og:description" content="Мотивация
+Хардкорные байесиане характеризуются тем, что никакие точечные оценки им не интересны, а интересны распределения целиком. При этом байесовские статистики интересуются апостериорными распреде">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2018-06-30T15:27:38+03:00">
+<meta property="article:tag" content="deep learning">
+<meta property="article:tag" content="generative models">
+<meta property="article:tag" content="mathjax">
+<meta property="article:tag" content="probabilistic modeling">
+</head>
+<body>
+    <a href="#content" class="sr-only sr-only-focusable">Перейти к главному содержимому</a>
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+            styles, `#sidebar-checkbox` for behavior. -->
+    <input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox"><!-- Toggleable sidebar --><div class="sidebar" id="sidebar">
+        <div class="sidebar-item">
+            <p>Обзоры не являются официальной позицией группы и предназначены исключительно для внутреннего использования.</p>
+        </div>
+        
+    <nav id="menu" role="navigation" class="sidebar-nav"><a class="sidebar-nav-item" href="../../authors/">Авторы</a>
+        <a class="sidebar-nav-item" href="../../archive.html">Архив</a>
+        <a class="sidebar-nav-item" href="../../categories/">Тэги</a>
+    
+    
+    </nav>
+</div>
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+          
+    <h3 id="brand" class="masthead-title">
+      <a href="../../" title="Codename 'Sufficient Statistics'" rel="home">Codename 'Sufficient Statistics'</a>
+    </h3>
+
+
+        </div>
+      </div>
+
+      <div class="container content" id="content">
+        
+<article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><div class="paper-link">
+        <a href="https://arxiv.org/abs/1802.07535">Paper</a>
+    </div>
+    <header><h1 class="post-title p-name entry-title" itemprop="headline name"><a href="." class="u-url">BRUNO: A Deep Recurrent Model for Exchangeable Data</a></h1>
+
+        
+        <ul itemprop="keywords" class="tags">
+<li><a class="tag p-category" href="../../categories/deep-learning/" rel="tag">deep learning</a></li>
+            <li><a class="tag p-category" href="../../categories/generative-models/" rel="tag">generative models</a></li>
+            <li><a class="tag p-category" href="../../categories/probabilistic-modeling/" rel="tag">probabilistic modeling</a></li>
+        </ul></header><div class="e-content entry-content" itemprop="articleBody text">
+    <h1 id="мотивация">Мотивация</h1>
+<p>Хардкорные байесиане характеризуются тем, что никакие точечные оценки им не интересны, а интересны распределения целиком. При этом байесовские статистики интересуются апостериорными распределениями на неизвестные латентные величины <span class="math inline">\(p(\theta|x)\)</span>, а вот байесовские машинлёрнеры интересуются предиктивными моделями, поэтому их святой грааль – это т.н. posterior predictive <span class="math inline">\(p(x_n|x_{&lt;n})\)</span>.</p>
+<p>В этой статье мы зададимся целью построить и обучить нейробайесовскую модель с tractable posterior predictive.</p>
+<h1 id="введение">Введение</h1>
+<p>Вообще говоря, для Байесианина предположение независимости и одинаковой распределённости означает невозможность хоть что-либо выучить из данных. В самом деле, если <span class="math inline">\(x_1\)</span> и <span class="math inline">\(x_2\)</span> независимы, то что один может сказать о другом? О каком обучении вообще идёт речь? На самом деле у нас истинно независимых данных никогда нет, и даже наши обучающие выборки независимы лишь в предположении известности генерирующего их распределения.</p>
+<p>Если же распределение неизвестно, то можно ослабить требования независимости, заменив его на свойство <strong>перестановочности</strong>: если применение произвольной перестановки не меняет вероятности увидеть такие данные, т.е. <span class="math inline">\(p(x_1, \dots, x_n, \dots) = p(x_{\pi(1)}, \dots, x_{\pi(n)}, \dots)\)</span> для любой перестановки <span class="math inline">\(\pi\)</span>.</p>
+<p>Для перестановочных распределений справедлива т.н. <strong>теорема де Финетти</strong>: если <span class="math inline">\(p(x_1, \dots, x_n)\)</span> перестановочно, то существует <span class="math inline">\(\theta\)</span> т.ч. все <span class="math inline">\(x_i\)</span> условно независимы при условии <span class="math inline">\(\theta\)</span> (то самое <em>распределение</em> из первого абзаца этой секции).</p>
+<p><span class="math display">\[
+p(x_1, \dots, x_n) = \int \prod_{i=1}^n p(x_i | \theta) p(\theta) d\theta
+\]</span></p>
+<p>Понятно, что в такой модели posterior predictive принимает всем нам привычную форму</p>
+<p><span class="math display">\[
+p(x_n | x_{&lt;n}) = \int p(x_n, \theta | x_{&lt;n}) d\theta = \int p(x_n | \theta) p(\theta | x_{&lt;n}) d\theta
+\]</span></p>
+<p>Интеграл этот посчитать (или хорошо приблизить) аналитически можно лишь в редких случаях (линейная и логистическая регрессии, например), но сегодня мы зададимся весьма амбициозной целью построить нейробайесовскую модель, которая бы моделировала <span class="math inline">\(p(x_n | x_{&lt;n})\)</span> напрямую!</p>
+<h1 id="описание-модели">Описание модели</h1>
+<h2 id="процесс-стьюдента">Процесс Стьюдента</h2>
+<p>Это как гауссовский процесс, только стьюдентовский.</p>
+<p><strong>Многомерное распределение Стьюдента</strong> <span class="math inline">\(\text{MVT}_n(\nu, \mu, K)\)</span>, где <span class="math inline">\(\nu \ge 2\)</span> – число степеней свободы <a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a>, <span class="math inline">\(\mu \in \mathbb{R}^n\)</span> – среднее и <span class="math inline">\(K\)</span> – положительно определённая матрица ковариации, имеет плотность <span class="math display">\[
+p(z) = \frac{\Gamma(\tfrac{\nu + n}{2})}{\sqrt{\text{det}((\nu-2) \pi K)} \Gamma\left(\tfrac{\nu}{2}\right)} \left(1 + \frac{(z - \mu)^T K^{-1} (z - \mu)}{\nu - 2} \right)^{-\frac{\nu + n}{2}}
+\]</span></p>
+<p>По аналогии с нормальным распределением, если совместное распределение вектора <span class="math inline">\(z\)</span> имеет многомерное распределение Стьюдента, то и при его разбиении на 2 подвектора <span class="math inline">\(z = (z_a, z_b)\)</span> условное распределение <span class="math inline">\(p(z_a | z_b)\)</span> будет многомерным Стьюдентовским, а именно если</p>
+<p><span class="math display">\[
+\begin{bmatrix} z_a \\ z_b \end{bmatrix}
+\sim
+\text{MVT}\left(\nu,
+\begin{bmatrix} \mu_a \\ \mu_b \end{bmatrix},
+\begin{bmatrix} K_{aa} &amp; K_{ab} \\ K_{ba} &amp; K_{bb} \end{bmatrix}
+ \right)
+\]</span></p>
+<p>то <span class="math inline">\(z_b | z_a \sim \text{MVT}\left(\nu + n_a, \tilde{\mu}_b, \frac{\nu + \beta_a - 2}{\nu + n_a - 2} \tilde{K}_{bb} \right)\)</span>, где</p>
+<p><span class="math display">\[
+\begin{align}
+\tilde\mu_b &amp;= K_{ba} K_{aa}^{-1} (z_a - \mu_a) + \mu_b \\
+\beta_a &amp;= (z_a - \mu_a)^T K_{aa}^{-1} (z_a - \mu_a) \\
+\tilde{K}_{bb} &amp;= K_{bb} - K_{ba} K_{aa}^{-1} K_{ab}
+\end{align}
+\]</span></p>
+<p>Как и в случае с Гауссовским Процессом, здесь нужно обращать матрицу ковариации, что в общем случае стоит <span class="math inline">\(O(n^3)\)</span>.</p>
+<p>У Стьюдентовского процесса есть 2 свойства:</p>
+<ol type="1">
+<li>Количество степеней свободы <span class="math inline">\(\nu\)</span> контроллирует хвосты распределения. Чем оно больше, тем легче становятся хвосты и тем ближе распределение Стьюдента к распределению Гаусса. Напротив, при уменьшении <span class="math inline">\(\tau\)</span> хвосты становятся тяжелее и распределение Коши, например, является частным случаем распределения Стьюдента.</li>
+<li>Предиктивная дисперсия (ковариация для <span class="math inline">\(z_b|z_a\)</span>) домножается на <span class="math inline">\(\tfrac{\nu + \beta_a - 2}{\nu + n_a - 2}\)</span> где <span class="math inline">\(\beta_a\)</span>, по-сути, измеряет эффективное отклонение наблюдения <span class="math inline">\(z_a\)</span> от своего мат. ожидания – т.е. чем сильнее семплы отклоняются от мат. ожидания, тем больше будет предиктивная дисперсия, чем в гауссовском случае <a href="#fn2" class="footnote-ref" id="fnref2"><sup>2</sup></a>
+</li>
+</ol>
+<h2 id="real-nvp">Real NVP</h2>
+<p><a href="https://arxiv.org/abs/1605.08803">Real NVP</a> – это специальный класс моделей биективных функций на нейросетях с эффективно вычисляемым якобианом. А именно, эти модели состоят из т.н. связывающих слоёв, в которых часть входов копируется как есть, а оставшаяся часть аффинно <a href="#fn3" class="footnote-ref" id="fnref3"><sup>3</sup></a> преобразуется</p>
+<p><span class="math display">\[
+\begin{align}
+y^{1:d} &amp;= x^{1:d} \\
+y^{d+1:D} &amp;= x^{d+1:D} \circ \exp(s(x^{1:d})) + t(x^{1:d})
+\end{align}
+\]</span></p>
+<p>Где <span class="math inline">\(\circ\)</span> – поточечное умножение, <span class="math inline">\(s\)</span> – лог-масштабирующий коэффициент, t – коэффциент сдвига, оба могут быть произвольно сложными функциями (любыми нейросетями). Нетрудно убедиться, что</p>
+<ol type="1">
+<li>Такой слой довольно легко обратить – просто взять <span class="math inline">\(y^{1:d}\)</span>, прогнать через нейросети <span class="math inline">\(s\)</span> и <span class="math inline">\(t\)</span>, получить коэффициенты аффинного преобразования и применить обратное к нему к <span class="math inline">\(y^{d+1:D}\)</span>.</li>
+<li>Матрица Якоби у такого слоя имеет очень приятную нижнетреугольную структуру, поэтому её определитель равен произведению диагональных элементов и, как следствие, легко (с линейной сложностью) вычисляется.</li>
+</ol>
+<p>Настекав таких слоёв, и меняя разбиение нейронов на копируемые-преобразуемые, мы можем выражать какие-то сложные нелинейные нейросетевые архитектуры.</p>
+<h2 id="bruno">BRUNO</h2>
+<p>Теперь совместим ежа с ужом, а именно закодируем наши входы каким-то RealNVP и предположим, что они совместно распределены по Стьюденту. Если входы <span class="math inline">\(x\)</span> (обучающие примеры) совместно перестановочны, то и выходы RealNVP <span class="math inline">\(z\)</span> (скрытые представления) будут совместно перестановочны.</p>
+<p>Мы сделаем 2 модельных предположения о распределении представлений <span class="math inline">\(z\)</span></p>
+<ol type="1">
+<li>Все компоненты <span class="math inline">\(z\)</span> независимы: <span class="math inline">\(p(z) = \prod_{d=1}^D p(z_d)\)</span>
+</li>
+<li>Каждая компонента совместно по всем наблюдениям распределена по Стьюденту: <span class="math inline">\(z_1^d, \dots, z_n^d \sim \text{MVT}(\nu^d, \mu^d \mathbf{1}_n, K^d)\)</span> где в <span class="math inline">\(K\)</span> на главной диагонали стоят <span class="math inline">\(v^d\)</span>, а вне – <span class="math inline">\(\rho^d\)</span> <a href="#fn4" class="footnote-ref" id="fnref4"><sup>4</sup></a> т.ч. <span class="math inline">\(0 \le \rho^d &lt; v^d\)</span>, а <span class="math inline">\(\nu^d, \mu^d, v^d, \rho^d\)</span> – настраиваемые скаляры.</li>
+</ol>
+<p>Теперь мы можем для каждой координаты посчитать posterior predictive <span class="math inline">\(p(z_{n+1} | z_{\le n})\)</span> с использованием свойства условных стьюдентов. Мы уже знаем, что это будет другой Стьюдент, параметры его будут выглядеть так</p>
+<p><span class="math display">\[
+\nu_{n+1} = \nu_n + 1, \quad
+\mu_{n+1} = (1-d_n) \mu_n + d_n z_n, \quad
+v_{n+1} = (1-d_n) v_n + d_n (v - p), \quad
+\]</span></p>
+<p>Где <span class="math inline">\(d_n = \tfrac{\rho}{\nu + \rho(n-1)}\)</span>, а <span class="math inline">\(\rho_{n+1}\)</span> нам считать не нужно, ибо <span class="math inline">\(z_{n+1}\)</span> есть скаляр. Что нужно, тем не менее считать, так это <span class="math inline">\(\beta_{n+1}\)</span> – член, понижающий / повышающий дисперсию. Формулу можно найти в статье. Из всех этих формул видно, что пересчёт параметров распределения занимает линейное время и полностью дифференцируем, а значит, мы можем эффективно обучать такие архитектуры.</p>
+<p>Итого, мы построили перестановочный процесс Стьюдента в пространстве представлений <span class="math inline">\(z\)</span>, добавить ещё обратимый RealNVP и вуаля – у нас на руках перестановочный процесс в пространстве наблюдений <span class="math inline">\(x\)</span>. Можно делать что угодно – взять <span class="math inline">\(x\)</span>’ы, перейти к соответствующим <span class="math inline">\(z\)</span>, засемплировать следующий, восстановить соответсвующий <span class="math inline">\(x\)</span>. Можно найти маргинальное распределение на <span class="math inline">\(x\)</span>, домножив распределение <span class="math inline">\(z\)</span> на якобиан.</p>
+<p><img src="../../post-images/bruno-a-deep-recurrent-model-for-exchangeable-data/fig1.png"></p>
+<p>Обучается всё тоже просто, “teacher forcing”ом как в RNN-ках. Параметров тоже не очень много: столько, сколько нужно для RealNVP, да по 4 на каждую компоненту входа.</p>
+<h1 id="эксперименты">Эксперименты</h1>
+<h2 id="few-shot-генеративные-модели">Few-shot генеративные модели</h2>
+<p>Для экспериментов авторы подавали картинки omniglot’а в модель и просили предсказать следующую картинку. Важно заметить, что во время <em>обучения</em> модель не видела картинки этого класса, ей их подали только на тесте для генерации. На картинке ниже каждый столбец – это 4 семпла после того, как мы пронаблюдали верхний ряд <em>до соответствующего</em> столбца (слева направо). Кажется, со временем модель адаптируется генерировать что-то Ж-образное.</p>
+<p><img src="../../post-images/bruno-a-deep-recurrent-model-for-exchangeable-data/fig2.png"></p>
+<p>А вот теперь мы будем постоянно подавать одну и ту же картинку – posterior predictive должен начать вырождаться в неё, и правда, вариативность семплов уменьшается. Как я понял, происходит это в том числе благодаря Процессу Стьюдента! Та самая магическая <span class="math inline">\(\beta_a\)</span> становится сильно меньше <span class="math inline">\(n_a\)</span>, что приводит к занижению дисперсии.</p>
+<p><img src="../../post-images/bruno-a-deep-recurrent-model-for-exchangeable-data/fig2-1.png"></p>
+<h2 id="few-shot-классификация">Few-shot классификация</h2>
+<p>Давайте теперь возьмём нашу генеративную модель и попробуем ею классифицировать входы. Для этого просто загрузим примеры соответствующего класса в историю модели и посмотрим на правдоподобие нашего входа при такой истории. Какой класс приведёт к максимальному – тот и выдадим. (k-way – это на k классов)</p>
+<p><img src="../../post-images/bruno-a-deep-recurrent-model-for-exchangeable-data/table1.png"></p>
+<p>Авторы побили бейзлайн, но проиграли т.н. matching nets, которые, как утверждается, учатся в дискриминативном режиме и вообще обучаются в том же режиме, в котором используются, так что не страшно.</p>
+<h2 id="а-всё-таки-что-если-gp">А всё-таки что если GP?</h2>
+<p>Наконец, авторы провели эксперименты с моделью, заменив <span class="math inline">\(\mathcal{TP}\)</span> на <span class="math inline">\(\mathcal{GP}\)</span>, и получилось, что априорные семплы вообще бесмысленны. Связанно это с тем, что <span class="math inline">\(\mathcal{GP}\)</span> вообще не любит выбросы, а RealNVP иногда (примерно в трети случаев!) выдавало фичи очень сильно отклоняющиеся от предполагаемого априорного <span class="math inline">\(p(z^d)\)</span> (см. картинку ниже), дальнейший анализ показал, что в этих случаях модель выучивала <span class="math inline">\(\rho \approx v\)</span>, что приводило к практически детерминированной корреляции между соседними (по “времени”) z’ами и как следствие модель забывала априорные уже после одного шага <a href="#fn5" class="footnote-ref" id="fnref5"><sup>5</sup></a>. С другой стороны, успех <span class="math inline">\(\mathcal{TP}\)</span> авторы объясняют взглядом на него как на <span class="math inline">\(\mathcal{GP}\)</span> с обратным Уишартом в качестве априорного на ковариацию, исправляющим этот баг. Опять же, <span class="math inline">\(\beta_a\)</span> позволяет модели адаптироваться к пере-дисперсии и недо-дисперсии относительно Гауссовского случая.</p>
+<p><img src="../../post-images/bruno-a-deep-recurrent-model-for-exchangeable-data/fig3.png"></p>
+<h1 id="заключение">Заключение</h1>
+<p>Очень интересная идея. Результаты, конечно, не впечатляют, но для начала сойдёт. Возможно, проблемы статьи скорее проистекают из выбора биективной сети в качестве энкодера-декодера: необходимость уметь точно восстановить вход позволяет лишь немного распутать существующие признаки и не даёт выучить абстрактные (потому что забывать ничего нельзя, а размерность увеличивать нельзя).</p>
+<p>На распределение Стьюдента и его чудесное свойство по “подстройке” под пере/недо-дисперсию точно нужно обратить большее внимание.</p>
+<section class="footnotes"><hr>
+<ol>
+<li id="fn1"><p>Вообще-то, многомерное распределение Стьюдента можно задать и для <span class="math inline">\(\nu &lt; 2\)</span>, в <a href="https://en.wikipedia.org/wiki/Multivariate_t-distribution">Википедии</a>, например, приведена альтернативная параметризация этого распределения, допускающая такие степени свободы. Правда, хвосты станут настолько тяжёлыми, что дисперсия и другие вторые моменты перестанут существовать.<a href="#fnref1" class="footnote-back">↩</a></p></li>
+<li id="fn2"><p>Не спрашивайте меня, при чём тут Гауссовское распределение, если всё распределено по Стьюденту.<a href="#fnref2" class="footnote-back">↩</a></p></li>
+<li id="fn3"><p>Тут можно использовать любую эффективно обратимую функцию, в частности я не понимаю, почему после аффинного преобразования не используется какой-нибудь гиперболический тангенс, например.<a href="#fnref3" class="footnote-back">↩</a></p></li>
+<li id="fn4"><p>Матрица ковариации имеет такую простую структуру ради свойства перестановочности. Кажется, ничего сложнее сделать нельзя.<a href="#fnref4" class="footnote-back">↩</a></p></li>
+<li id="fn5"><p>Возможно, это можно было бы исправить, обучая модель в априорном режиме (с пустой историей для обуславливания).<a href="#fnref5" class="footnote-back">↩</a></p></li>
+</ol></section>
+</div>
+
+    <aside class="post-meta"><a class="post-author" href="../../authors/artiom-sobolev/">Артём Соболев</a>
+    <time class="post-date published dt-published" datetime="2018-06-30T15:27:38+03:00" itemprop="datePublished" title="30 июня 2018">30 июня 2018</time></aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script></article>
+</div>
+    </div>
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+    
+    
+        <footer id="footer"><p>Contents © 2018         <a href="mailto:info@bayesgroup.ru">BayesGroup</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
+            
+        </footer><script src="../../assets/js/jquery.min.js"></script><script src="../../assets/js/moment-with-locales.min.js"></script><script src="../../assets/js/fancydates.js"></script><!-- fancy dates --><script>
+    moment.locale("ru");
+    fancydates(2, "DD.MM.YYYY");
+    </script><!-- end fancy dates -->
+</body>
+</html>
