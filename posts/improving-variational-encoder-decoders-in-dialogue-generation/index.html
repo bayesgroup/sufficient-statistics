@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " vocab="http://ogp.me/ns" lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>Improving Variational Encoder-Decoders in Dialogue Generation | Codename 'Sufficient Statistics'</title>
+<link href="../../assets/css/rst.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/poole.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/lanyon.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/code.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/custom.css" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=PT+Serif:400,400italic,700%7CPT+Sans:400">
+<link rel="canonical" href="http://bayesgroup.github.io/sufficient-statistics/posts/improving-variational-encoder-decoders-in-dialogue-generation/">
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script><!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="Артём Соболев">
+<link rel="prev" href="../the-horseshoe-prior/" title="The Horseshoe Prior" type="text/html">
+<link rel="next" href="../not-all-samples-are-created-equal-deep-learning-with-importance-sampling/" title="Not All Samples Are Created Equal: Deep Learning with Importance Sampling" type="text/html">
+<meta property="og:site_name" content="Codename 'Sufficient Statistics'">
+<meta property="og:title" content="Improving Variational Encoder-Decoders in Dialogue Generation">
+<meta property="og:url" content="http://bayesgroup.github.io/sufficient-statistics/posts/improving-variational-encoder-decoders-in-dialogue-generation/">
+<meta property="og:description" content="Мотивация
+Когда-то давным давно мы уже обсуждали вариационные автоэнкодеры для текста и их проблемы, а так же обсудили возможный способ их решения. Однако, у того подхода была проблема: уменьшая мощно">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2018-03-07T22:00:03+03:00">
+<meta property="article:tag" content="deep learning">
+<meta property="article:tag" content="generative models">
+<meta property="article:tag" content="mathjax">
+<meta property="article:tag" content="text modeling">
+<meta property="article:tag" content="variational autoencoders">
+</head>
+<body>
+    <a href="#content" class="sr-only sr-only-focusable">Перейти к главному содержимому</a>
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+            styles, `#sidebar-checkbox` for behavior. -->
+    <input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox"><!-- Toggleable sidebar --><div class="sidebar" id="sidebar">
+        <div class="sidebar-item">
+            <p>Обзоры не являются официальной позицией группы и предназначены исключительно для внутреннего использования.</p>
+        </div>
+        
+    <nav id="menu" role="navigation" class="sidebar-nav"><a class="sidebar-nav-item" href="../../authors/">Авторы</a>
+        <a class="sidebar-nav-item" href="../../archive.html">Архив</a>
+        <a class="sidebar-nav-item" href="../../categories/">Тэги</a>
+    
+    
+    </nav>
+</div>
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+          
+    <h3 id="brand" class="masthead-title">
+      <a href="../../" title="Codename 'Sufficient Statistics'" rel="home">Codename 'Sufficient Statistics'</a>
+    </h3>
+
+
+        </div>
+      </div>
+
+      <div class="container content" id="content">
+        
+<article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><div class="paper-link">
+        <a href="https://arxiv.org/abs/1802.02032">Paper</a>
+    </div>
+    <header><h1 class="post-title p-name entry-title" itemprop="headline name"><a href="." class="u-url">Improving Variational Encoder-Decoders in Dialogue Generation</a></h1>
+
+        
+        <ul itemprop="keywords" class="tags">
+<li><a class="tag p-category" href="../../categories/deep-learning/" rel="tag">deep learning</a></li>
+            <li><a class="tag p-category" href="../../categories/generative-models/" rel="tag">generative models</a></li>
+            <li><a class="tag p-category" href="../../categories/text-modeling/" rel="tag">text modeling</a></li>
+            <li><a class="tag p-category" href="../../categories/variational-autoencoders/" rel="tag">variational autoencoders</a></li>
+        </ul></header><div class="e-content entry-content" itemprop="articleBody text">
+    <h1 id="мотивация">Мотивация</h1>
+<p>Когда-то давным давно мы <a href="https://bayesgroup.github.io/sufficient-statistics/posts/improved-variational-autoencoders-for-text-modeling-using-dilated-convolutions/">уже обсуждали</a> вариационные автоэнкодеры для текста и их проблемы, а так же обсудили возможный способ их решения. Однако, у того подхода была проблема: уменьшая мощность декодера мы получали более осмысленные латентные представления, но качество генеративной модели ухудшалось. В данной работе хочется получить именно хорошую генеративную модель, поэтому исправлять VAE будем иначе.</p>
+<p>Вообще, статья про диалоговые модели, но диалоговая модель – это просто обусловленная языковая модель, поэтому я расскажу про вариационные языковые модели, а “диалоговость” додумаете себе сами, просто обусловив всё на свете на диалоговый контекст <span class="math inline">\(c\)</span>.</p>
+<h1 id="немного-анализа">Немного анализа</h1>
+<p>Оптимизация целевой функции VAE эквивалентно максимизации следующего</p>
+<p><span class="math display">\[
+\log \mathbb{E}_{p(z)} p(x|z) - D_{KL}(q(z|x) \mid\mid p(z|x))
+\]</span></p>
+<p>Первое слагаемое в точке максимума (по генеративным моделям) даёт <span class="math inline">\(\log p_\text{data}(x)\)</span>, и если декодер <span class="math inline">\(p(x|z)\)</span> достаточно мощный, чтобы выучить <span class="math inline">\(p_{\text{data}}(x)\)</span> (настоящее распределение данных) даже игнорируя <span class="math inline">\(z\)</span>, то это сгодится для оптимального решения. Однако, на практике может оказаться, что выучить желаемую модель <em>проще</em>, если всё-таки использовать <span class="math inline">\(z\)</span>. Рассмотрим простой пример: пусть нас интересует <span class="math inline">\(p(x) = \mathcal{N}(0, 1)\)</span>, а <span class="math inline">\(p(z) = \mathcal{N}(3, 1)\)</span>. Тогда чтобы <span class="math inline">\(p(x|z)\)</span> могло выучить искомую модель без использования <span class="math inline">\(z\)</span>, ей нужно уметь моделировать любые гауссианы, в то время как с использованием вспомогательной случайности <span class="math inline">\(z\)</span> можно обойтись классом детерминированных сдвигов на константу: <span class="math inline">\(p(x|z, a) = \delta(x - z + a)\)</span>.</p>
+<p>С другой стороны вычитаемое (KL-дивергенция с настоящим апостериорным) минимизируется, когда приближённое апостериорное точно равно настоящему. Если декодер не использует код, то настоящее апостериорное совпадает с априорным и легко приближается с помощью <span class="math inline">\(q(z|x)\)</span>. Но если декодер использует код, то настоящее апостериорное никогда не будет лежать в факторизованном семействе, ведь правдоподобие (в формуле Байеса) связывает все скрытые переменные. Т.е. если код используется, то целевой функционал “штрафуется” за это, если только мы не умеем <em>очень</em> хорошо приближать настоящее апостериорное. Соответственно, если мы берём какое-то простое семейство приближённых апостериорных, то оно не в состоянии генерировать сложные коды (в смысле сложности их распределения), поэтому модели проще отказаться от кода вообще, чтобы не платить “штраф” за использование скрытых переменных.</p>
+<p>Авторы утверждают таким образом, что при оптимизации этой целевой функции (что эквивалентно оптимизации ELBO), мы имеем противоборствующий эффект от этих двух слагаемых. С одной стороны, первое слагаемое пытается использовать использовать скрытые переменные активнее, а с другой стороны второе пытается от них избавиться. И то, что в текстовых VAE зачастую побеждает второе, есть результат того, что польза от использования латентных переменных не оправдываем цены их введения.</p>
+<h1 id="обзор-существующих-методов">Обзор существующих методов</h1>
+<p>Соответственно, авторы выделяют два главных направления решения этой проблемы: либо сделать использование латентных переменных более выгодным, либо уменьшить цену их использования. В первое направление попадают методы вроде ослабления декодера: word-dropout (<a href="https://arxiv.org/abs/1511.06349">Bowman et al.</a>), использование декодеров с ограниченым рецептивным полем (<a href="https://arxiv.org/abs/1702.08139">Yang et al.</a>, <a href="https://arxiv.org/abs/1611.02731">Chen et al.</a>), увеличение полезности кода путём предсказания BoW-представления ответа по нему (<a href="https://arxiv.org/abs/1703.10960%5D">Zhao et al.</a>). Ко второму направлению относится использование более мощного семейства априорных и приближённых апостериорных распределений, что позволяет уменьшить цену использования латентных переменных: <a href="https://arxiv.org/abs/1612.00377">Serban et al.</a> предложили заменить Гауссовские распределения на кусочно-постоянное, которое обладает большей гибкостью (может быть мультимодально, например), <a href="https://arxiv.org/abs/1410.6460">Salimans et al.</a> предложили использовать MCMC для семплирования латентных переменных. А ещё <a href="https://arxiv.org/abs/1505.05770">Rezende and Mohamed</a>, <a href="https://arxiv.org/abs/1606.04934">Kingma et al.</a> и <a href="https://arxiv.org/abs/1611.02731">Chen et al.</a> предложили использовать нормализующие потоки для более выразительных апостериорных распределений. Авторы говорят, что для генерации текста эти модели пока не применялись, и сами тоже этого почему-то не делают.</p>
+<h1 id="предложенная-модель">Предложенная модель</h1>
+<p>Поскольку авторы не хотят жертвовать генеративной мощностью модели, они выбирают другой путь: более сложные распределения для кодов. И чтобы не размениваться по мелочам, сразу выбирают “неявную модель”: семпл получается путём пропуска нормального шума через обучаемую нейросеть. В обычном ELBO так сделать не получится, т.к. мы не сможем посчитать KL-дивергенцию с априорным, ведь не можем посчитать плотность того, что получается на выходе у нейросети. Поэтому авторы ничтоже сумняшеся заменяют KL-дивергенцию на JS-дивергенцию, оптимизацию которой можно свести к GAN’оподобной процедуре, а там плотности не нужны.</p>
+<p><span class="math display">\[
+\mathbb{E}_{q(z|x)} \log p(x|z) - D_{JS}(q(z|x) \mid\mid p(z))
+\]</span></p>
+<p>Но и эта постановка авторам не нравится, т.к. GAN’ы обучать-то сложно! Поэтому они заменяют GAN на VAE… Непонятно? Следите за руками:</p>
+<ol type="1">
+<li>Хочется обучать VAE с неявным распределением на <span class="math inline">\(z\)</span>, т.е. таким, из которого мы только семплировать умеем, а плотность считать не можем.</li>
+<li>Плотность нам нужна только для подсчёта KL-дивергенции, поэтому давайте заменим её на какую-нибудь дивергенцию, которую можно посчитать без плотности <a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a>. Дивергенцию Йенсена-Шеннона, например.</li>
+<li>JS-дивергенцию <span class="math inline">\(D_{JS}(q(z|x) \mid\mid p(z))\)</span> мы можем оценить в духе GAN’ов, по-сути, минимизация такой дивергенции по первому аргументу эквивалентна обучению генеративной модели <span class="math inline">\(q(z|x)\)</span> для “ground truth” распределения <span class="math inline">\(p(z)\)</span>. Поэтому давайте обучим такую модель с помощью VAE, т.е., условно говоря, насемплируем <span class="math inline">\(z \sim p(z)\)</span>, заведём <span class="math inline">\(q(\varepsilon|x, z)\)</span> – inference-сеть, <span class="math inline">\(p(z|\varepsilon)\)</span> – генеративную сеть и априорное <span class="math inline">\(p(\varepsilon|x)\)</span>, обучим из этого VAE, а потом скажем, что генеративный процесс <span class="math inline">\(x \mapsto \varepsilon \mapsto z\)</span> определяет процесс семплирвоания из <span class="math inline">\(q(z|x)\)</span> (то есть, задает неявную генеративную модель). Приводить это должно к следующей целевой функции <span class="math display">\[ \mathbb{E}_{q(\varepsilon \mid x, z)} \log p(z\mid\varepsilon) - D_{KL}(q(\varepsilon|x, z) \mid\mid p(\varepsilon | x)), \quad\quad z \sim p(z) \]</span>
+</li>
+</ol>
+<p>На этом интересные идеи в статье заканчивается, потому что по всей видимости в этот момент у авторов произошёл “math overflow” и дальнейшее никакой математикой не описывается. А именно, JS-дивергенцию они заменили на</p>
+<p><span class="math display">\[
+\mathbb{E}_{q(\varepsilon|\hat{z})} \log p(\hat{z}|\varepsilon) - D_{KL}(q(\varepsilon|\hat{z}) \mid\mid p(\varepsilon))
+\]</span></p>
+<p>Здесь <span class="math inline">\(\hat{z}\)</span> – это выход какого-то RNN-энкодера для последовательности <span class="math inline">\(x\)</span>. То есть теперь мы учим модель не семплы из <span class="math inline">\(p(z)\)</span> генерировать (т.е. регуляризовываем модель), а приближать распределение выходов некоторого RNN-энкодера. Эта модель будет хорошо работать, если наше вариационное приближение <span class="math inline">\(q(\varepsilon|\hat{z})\)</span> хорошо приближает настоящее апостериорное <span class="math inline">\(p(\varepsilon|\hat{z})\)</span>. Тут авторы предлагают сразу учить RNN-энкодер так, чтобы <span class="math inline">\(D_{KL}(q(\varepsilon|\hat{z}) \mid\mid p(\varepsilon))\)</span> был не больше какого-то значения <span class="math inline">\(\alpha\)</span>, достигается это просто добавлением ещё одного слагаемого к лоссу</p>
+<p><span class="math display">\[
+\max \left( \alpha, D_{KL}(q(\varepsilon|\hat{z}) \mid\mid p(\varepsilon)) \right) \to \min_{\theta_{\text{RNN-Enc}}}
+\]</span></p>
+<p>Однако, непонятно, действительно ли это делает апостериорное более “приближаемым”.</p>
+<p>Ещё авторы используют scheduled sampling, но это <a href="https://www.inference.vc/scheduled-sampling-for-rnns-scoring-rule-interpretation/">вредная и математически некорректная процедура</a>.</p>
+<p>Итого, модель состоит из двух частей: автоэнкодера с параметрами <span class="math inline">\(\theta\)</span> и CVAE с параметрами <span class="math inline">\(\phi\)</span>, обучающимися со следующими лоссами</p>
+<p><span class="math display">\[
+\tfrac{1}{2} \mathbb{E}_{q_\phi(\varepsilon|\hat{z})} \|g_\phi(\varepsilon) - \hat{z}\|^2 + D_{KL}(q_\phi(\varepsilon|\hat{z}) \mid\mid p_\theta(\varepsilon)) \to \min_\phi
+\]</span></p>
+<p><span class="math display">\[
+\max(\alpha, D_{KL}(q_\phi(\varepsilon|\hat{z}) \mid\mid p_\theta(\varepsilon))) - \mathbb{E}_{q_\phi(\varepsilon|\hat{z})} \log p_\theta(x|z) \to \min_\theta
+\]</span></p>
+<p>Где <span class="math inline">\(\hat{z} = f_\theta(x)\)</span>, а <span class="math inline">\(z\)</span> – scheduled sampling, иногда берущий <span class="math inline">\(\hat{z}\)</span> с некоторой отжигаемой вероятностью <span class="math inline">\(p\)</span>, и <span class="math inline">\(g_\phi(\varepsilon)\)</span> (семпл из VAE) с вероятностью <span class="math inline">\(1-p\)</span>.</p>
+<h1 id="эксперименты">Эксперименты</h1>
+<p>Сравниваются на задачах моделирования диалогов с базовым HRED’ом (не вариационная модель) и вариационным HRED’ом с разными хаками: KL-annealing (KLA), word dropout (DO), free bits (FB), Bag-of-Words loss (BOW). Свою модель авторы называют CO (collaborative model, видимо, из-за коллаборации VAE и AE).</p>
+<p><img src="../../post-images/improving-variational-encoder-decoders-in-dialogue-generation/metrics1.png" class="medium"></p>
+<p>Не очень понятно, почему выделена меньшая KL дивергенция – кажется, это наоборот означает, что код близок к априорному шуму и полезной информации не несёт (всё тот же posterior collapse).</p>
+<p>Ещё авторы считают embedding-level метрики (типа чтобы захватить похожесть на уровне всего предложения)</p>
+<p><img src="../../post-images/improving-variational-encoder-decoders-in-dialogue-generation/metrics2.png" class="medium"></p>
+<p>Так же было проведено Human Evaluation: для 100 случайных контекстов 6-ю моделями с использованием бимсёрча были сгенерированы ответы и оценены людишками по трём пунктам: Fluency (правильность использования языка), Coherency (соответствие ответа контексту) и Diversity (“нескучность” ответа)</p>
+<p><img src="../../post-images/improving-variational-encoder-decoders-in-dialogue-generation/metrics3.png" class="medium"></p>
+<p>Ну и немного семплов</p>
+<p><img src="../../post-images/improving-variational-encoder-decoders-in-dialogue-generation/table3.png"></p>
+<h1 id="резюме">Резюме</h1>
+<p>Всё началось очень интересно: правильные мысли об усложнении приближённого апостериорного, но закончилось какими-то ad hoc ужасами. Взяли обычный автоэнкодер для текста и воткнули внутрь VAE. Все гарантии на оптимизацию маргинального правдоподобия (или её нижней оценки) были утеряны.</p>
+<section class="footnotes"><hr>
+<ol>
+<li id="fn1"><p>После такого действа наша целевая функция уже не будет нижней оценкой на правдопдобие, но её оптимизация по параметрам генеративной модели всё ещё эквивалентна тому, что происходит в обычном VAE.<a href="#fnref1" class="footnote-back">↩</a></p></li>
+</ol></section>
+</div>
+
+    <aside class="post-meta"><a class="post-author" href="../../authors/artiom-sobolev/">Артём Соболев</a>
+    <time class="post-date published dt-published" datetime="2018-03-07T22:00:03+03:00" itemprop="datePublished" title="07 марта 2018">07 марта 2018</time></aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script></article>
+</div>
+    </div>
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+    
+    
+        <footer id="footer"><p>Contents © 2018         <a href="mailto:info@bayesgroup.ru">BayesGroup</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
+            
+        </footer><script src="../../assets/js/jquery.min.js"></script><script src="../../assets/js/moment-with-locales.min.js"></script><script src="../../assets/js/fancydates.js"></script><!-- fancy dates --><script>
+    moment.locale("ru");
+    fancydates(2, "DD.MM.YYYY");
+    </script><!-- end fancy dates -->
+</body>
+</html>

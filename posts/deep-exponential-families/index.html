@@ -108,7 +108,7 @@ MathJax.Hub.Config({
 <p><img src="../../post-images/deep-exponential-families/examples.png"></p>
 <p>где Z-Dist - распределение скрытых переменных, W-Dist - априорное распределение на веса слоев, <span class="math inline">\(g_l\)</span> - link function в слоях.</p>
 <h1 id="inference">Inference</h1>
-<p>Для получения апостериорного распределения p(Z, W | X) авторы используют вариационный вывод, а именно изобретенный раннее Black Box Variational Inference (<a href="http://artem.sobolev.name/posts/2016-07-05-neural-variational-inference-blackbox.html">обзор от Артёма Соболева</a> <a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a>).</p>
+<p>Для получения апостериорного распределения p(Z, W | X) авторы используют вариационный вывод, а именно изобретенный раннее Black Box Variational Inference (<a href="http://artem.sobolev.name/posts/2016-07-05-neural-variational-inference-blackbox.html">обзор от Артёма Соболева</a> <a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a>).</p>
 <p><span class="math display">\[\mathcal{L}(q) = \mathbb{E}_{q(Z, W)} [\log p(X, Z, W) - \log q(Z, W)] \rightarrow \max\limits_{\phi}\]</span></p>
 <p>где <span class="math inline">\(q(Z, W) = q(W_0) \big( \prod_{l=1}^{L-1} q(W_{l}) \prod_{n=1}^{N} q(z_{n, l}) \big) \prod_{n=1}^{N} q(z_{n, L})\)</span> - вариационное приближение апостериорного распределения (см. Mean Field). <span class="math inline">\(q(z_{n, l})\)</span> и <span class="math inline">\(q(W_{l})\)</span> так же полностью факторизуются.</p>
 <p><span class="math display">\[q(z_{n, l, k}) = \text{ExpFam}_{l}(z_{n, l, k}, \lambda_{n, l, k})\]</span></p>
@@ -118,7 +118,7 @@ MathJax.Hub.Config({
 <p>Эксперименты проводились на корпусах текстов New York Times и Science. В качестве бейзлайнов рассматривалась модель LDA и DocNade(вроде state-of-the-art на 2013 год, но это неточно). В качестве метрики качества, как это обычно делается в моделировании текстов, рассматривалась perplexity - (экспонента от логарифма правдоподобия, усредненного по общему количеству слов) на отложенной выборке. В качестве DEF моделей взяли описанные выше. Перебирали различные прайоры на веса, количество слоев и link function. Размеры слоев зафиксировали: 100, 30, 15. Получили следующие результаты:</p>
 <p><img src="../../post-images/deep-exponential-families/exp1.png" class="medium"></p>
 <h3 id="выводы">Выводы</h3>
-<ol type="1">
+<ol style="list-style-type: decimal">
 <li>DEFы обошли бейзлайны.</li>
 <li>Больше слоев - лучше (как в глубинных нейронных сетях, но не настолько глубинно).</li>
 <li>Bernoulli DEF сложно обучать, для них при увеличении количества слоев perplexity растет, видимо в градиентах уж очень много шума.</li>
@@ -130,15 +130,17 @@ MathJax.Hub.Config({
 &amp; z_{n, 1}^c - \text{скрытое представление пользователя}\\
 &amp; z_{i, 1}^r - \text{скрытое представление документа/фильма}\\
 \end{align}\]</span>
-<p>И добавляется еще “иерархия” (DEF) на <span class="math inline">\(z_{n, 1}^c\)</span> и <span class="math inline">\(z_{i, 1}^r\)</span>. Если посмотреть на графическую модель, то она будет отличаться от приведенной в самом начале тем, что теперь у нас вместо <span class="math inline">\(W_{0}\)</span> есть DEF, аналогичное ветвление слоев как это происходит от <span class="math inline">\(z_{n, 1}\)</span>. Такая модель называется Double DEF. В качестве метрик взяли perplexity и NDCG (метрика ранжирования, больше лучше). Перебирали количество слоев, получили аналогичный вывод: чем больше слоев, тем лучше (почти), бейзлайн также был побит.</p>
+<p>И добавляется еще "иерархия" (DEF) на <span class="math inline">\(z_{n, 1}^c\)</span> и <span class="math inline">\(z_{i, 1}^r\)</span>. Если посмотреть на графическую модель, то она будет отличаться от приведенной в самом начале тем, что теперь у нас вместо <span class="math inline">\(W_{0}\)</span> есть DEF, аналогичное ветвление слоев как это происходит от <span class="math inline">\(z_{n, 1}\)</span>. Такая модель называется Double DEF. В качестве метрик взяли perplexity и NDCG (метрика ранжирования, больше лучше). Перебирали количество слоев, получили аналогичный вывод: чем больше слоев, тем лучше (почти), бейзлайн также был побит.</p>
 <p><img src="../../post-images/deep-exponential-families/exp2.png"></p>
 <h1 id="итог">Итог</h1>
-<p>Авторы предложили новую генеративную вероятностную модель, которая имеет иерархическую структуру. Воспользовались раннее придуманным методом вывода и даже побили какие-то методы, что показали в экспериментах. Есть код на C++, видимо чтобы училось быстро, сами пишут, что может появится эта модель и в Edward’е, библиотеку для вероятностного моделирования, которую они разрабатывают.</p>
-<section class="footnotes"><hr>
+<p>Авторы предложили новую генеративную вероятностную модель, которая имеет иерархическую структуру. Воспользовались раннее придуманным методом вывода и даже побили какие-то методы, что показали в экспериментах. Есть код на C++, видимо чтобы училось быстро, сами пишут, что может появится эта модель и в Edward'е, библиотеку для вероятностного моделирования, которую они разрабатывают.</p>
+<div class="footnotes">
+<hr>
 <ol>
-<li id="fn1"><p>Примечание от Артёма Соболева: BBVI – не самый лучший способ делать вывод в стохастических вычислительных графах, современной науке известна масса методов лучше. См. мою серию про <a href="http://artem.sobolev.name/tags/stochastic%20computation%20graphs%20series.html">backprop в стохастических вычислительных графах</a> (work in progress).<a href="#fnref1" class="footnote-back">↩</a></p></li>
-</ol></section>
+<li id="fn1"><p>Примечание от Артёма Соболева: BBVI – не самый лучший способ делать вывод в стохастических вычислительных графах, современной науке известна масса методов лучше. См. мою серию про <a href="http://artem.sobolev.name/tags/stochastic%20computation%20graphs%20series.html">backprop в стохастических вычислительных графах</a> (work in progress).<a href="#fnref1">↩</a></p></li>
+</ol>
 </div>
+    </div>
 
     <aside class="post-meta"><a class="post-author" href="../../authors/artiom-gadetskii/">Артём Гадецкий</a>
     <time class="post-date published dt-published" datetime="2017-10-22T21:13:58+03:00" itemprop="datePublished" title="22 октября 2017">22 октября 2017</time></aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">

@@ -127,11 +127,11 @@ V^{\pi_\theta}(s) = \mathbb{E}_{\varepsilon \sim \mathcal{N}(0, I)} \left[ R(a(s
 <p>Алгоритм получается такой:</p>
 <p><img src="../../post-images/learning-continuous-control-policies-by-stochastic-value-gradients/svg-inf-alg.png" class="medium"></p>
 <h2 id="svg1">SVG(1)</h2>
-<p>Всё здорово, но вышеописанный алгоритм может иметь очень высокую дисперсию из-за необходимости “раскрутить” эпизод до конца. Кроме того, это on-policy алгоритм, т.е. он не умеет в experience replay. Можно было бы сделать Importance Sampling для превращения его в off-policy, но тогда весами были бы отношения вероятностей всех траекторий, что раздуло бы дисперсию ещё больше.</p>
+<p>Всё здорово, но вышеописанный алгоритм может иметь очень высокую дисперсию из-за необходимости "раскрутить" эпизод до конца. Кроме того, это on-policy алгоритм, т.е. он не умеет в experience replay. Можно было бы сделать Importance Sampling для превращения его в off-policy, но тогда весами были бы отношения вероятностей всех траекторий, что раздуло бы дисперсию ещё больше.</p>
 <p>Поэтому предлагается два нововведения:</p>
 <ul>
 <li>Критик <span class="math inline">\(\hat V(s|\nu)\)</span>, приближающий <span class="math inline">\(\mathbb{E} V(s)\)</span>. Теперь мы вместо односемпловой Монте Карло оценки <span class="math inline">\(\nabla_s V^{\pi_\theta} (s)\)</span> будем использовать производную критика <span class="math inline">\(\nabla_s \hat V(s|\nu)\)</span>, в котором, как мы надеемся, вся случайность выинтегрирована.</li>
-<li>Давайте раскручивать эпизод только на один шаг вперёд. По-сути, это эквивалетно удалению члена <span class="math inline">\(\nabla_\theta V^{\pi_\theta}(s')\)</span> из формулы градиента <span class="math inline">\(\nabla_\theta V^{\pi_\theta} (s)\)</span>. Тогда можно делать off-policy обучение (и, соответственно, experience replay) с помощью Importance Sampling’а, ведь корректирующими весами будут не отношения вероятностей всех траекторий, а лишь отношение вероятностей конкретных действий <a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a>.</li>
+<li>Давайте раскручивать эпизод только на один шаг вперёд. По-сути, это эквивалетно удалению члена <span class="math inline">\(\nabla_\theta V^{\pi_\theta}(s')\)</span> из формулы градиента <span class="math inline">\(\nabla_\theta V^{\pi_\theta} (s)\)</span>. Тогда можно делать off-policy обучение (и, соответственно, experience replay) с помощью Importance Sampling'а, ведь корректирующими весами будут не отношения вероятностей всех траекторий, а лишь отношение вероятностей конкретных действий <a href="#fn1" class="footnoteRef" id="fnref1"><sup>1</sup></a>.</li>
 </ul>
 <p>Алгоритм получается такой: <img src="../../post-images/learning-continuous-control-policies-by-stochastic-value-gradients/svg-1-alg.png" class="medium"></p>
 <p>Можно, конечно, рассмотреть SVG(k) для разных k, а можно пойти дальше и вспомнить про TD(λ). И правда, если заглянуть в исходники статьи (доступны на архиве), то можно обнаружить упоминание некоего SVG(λ), который представляет собой λ-интерполяцию между раскруткой эпизода до конца и использованием критика для следующего шага. То есть, формула градиента value-функции по состоянию будет выглядеть так:</p>
@@ -155,16 +155,18 @@ J(\theta) = \mathbb{E}_{s_0} \mathbb{E}_{\pi_\theta(a|s_0)} Q(a, s_0)
 <h1 id="эксперименты">Эксперименты</h1>
 <p>Сначала авторы показывают, как важно то, что они сумели обсуловиться на реальные траектории – иначе ошибка слишком сильно накапливается. Потом они сравниваются с Deterministic Policy Gradients.</p>
 <p><img src="../../post-images/learning-continuous-control-policies-by-stochastic-value-gradients/svg-exp1.png"></p>
-<p>Далее идут сравнения предложенных методов с DPG и Actor-Critic’ом в двух средах различной сложности (плюс см. следующий график). Средний график измеряет чувствительность предложенных алгоритмов к модели среды – SVG(∞) ломается довольно сильно при ухудшении среды, а вот SVG(1) – нет. <img src="../../post-images/learning-continuous-control-policies-by-stochastic-value-gradients/svg-exp2.png"></p>
+<p>Далее идут сравнения предложенных методов с DPG и Actor-Critic'ом в двух средах различной сложности (плюс см. следующий график). Средний график измеряет чувствительность предложенных алгоритмов к модели среды – SVG(∞) ломается довольно сильно при ухудшении среды, а вот SVG(1) – нет. <img src="../../post-images/learning-continuous-control-policies-by-stochastic-value-gradients/svg-exp2.png"></p>
 <p>Вот ещё эксперименты, как утверждают авторы, в более сложных средах: <img src="../../post-images/learning-continuous-control-policies-by-stochastic-value-gradients/svg-exp3.png"></p>
 <h1 id="резюме">Резюме</h1>
 <p>Интересная работа по использованию достижений нейробайесовских моделей в обучении с подкреплением. Я так и не понял из статьи, откуда авторы берут производные функции награды – доступны ли они им аналитически, или они их выучивают?</p>
 <p>Наверное, если использовать последние достижения в области релаксаций моделей с дискретными переменными, можно обобщить этот метод на среды с дискретными действиями.</p>
-<section class="footnotes"><hr>
+<div class="footnotes">
+<hr>
 <ol>
-<li id="fn1"><p>Вообще, конечно, наша генеративная модель состояний тоже меняется по ходу обучения и надо бы сделать поправку и на это тоже, т.е. добавить IS веса для нового состояния, однако, авторы утверждают, что “this is widely considered to be intractable”.<a href="#fnref1" class="footnote-back">↩</a></p></li>
-</ol></section>
+<li id="fn1"><p>Вообще, конечно, наша генеративная модель состояний тоже меняется по ходу обучения и надо бы сделать поправку и на это тоже, т.е. добавить IS веса для нового состояния, однако, авторы утверждают, что "this is widely considered to be intractable".<a href="#fnref1">↩</a></p></li>
+</ol>
 </div>
+    </div>
 
     <aside class="post-meta"><a class="post-author" href="../../authors/artiom-sobolev/">Артём Соболев</a>
     <time class="post-date published dt-published" datetime="2017-10-16T12:00:00+03:00" itemprop="datePublished" title="16 октября 2017">16 октября 2017</time></aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">

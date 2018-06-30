@@ -90,18 +90,27 @@ MathJax.Hub.Config({
 <h1 id="математика">Математика</h1>
 <p>В качестве такого пространства авторы предлагают использовать римановское многообразие – Grassmann manifold <span class="math inline">\(G(p, n), \, p &lt; n\)</span>. <span class="math inline">\(G(p, n)\)</span> – множество всех линейных подпространств <span class="math inline">\(\mathbb{R}^n\)</span> размерности <span class="math inline">\(p\)</span>. Если теперь взять многообразие <span class="math inline">\(G(1, n)\)</span> то точка на нем будет соответствовать <span class="math inline">\(\{ \alpha w \, \big| \, \alpha \in \mathbb{R} \}\)</span> для некоторого <span class="math inline">\(w \in \mathbb{R}^n\)</span>, а это ровно то, чего и хотелось. В качестве представления точки на таком многообразии предлагается брать вектор <span class="math inline">\(w\)</span> с единичной нормой. Легко представлять себе <span class="math inline">\(G(1, n)\)</span> как единичную сферу.</p>
 <p>Чтобы теперь запустить SGD на таком многообразии нужно много теории римановских многобразий. По факту обычный градиент <span class="math inline">\(g\)</span> (посчитанный в <span class="math inline">\(\mathbb{R}^n\)</span>) проектируется на касательную плоскость к точке в которой градиент считается (<span class="math inline">\(y\)</span>) и получется градиент на многобразии <span class="math inline">\(h\)</span>. Затем по геодезической из точки <span class="math inline">\(y\)</span> в направлении <span class="math inline">\(h\)</span> необходимо пройти длину <span class="math inline">\(\|h\|\)</span> и попасть в новую точку <span class="math inline">\(y_1\)</span>.</p>
-<figure><img src="../../post-images/riemannian-approach-to-batch-normalization/grad1.png" alt="grad"><figcaption>grad</figcaption></figure><p>Из данного алгоритма авторы также делают SGD c Momentum и ADAM.</p>
+<div class="figure">
+<img src="../../post-images/riemannian-approach-to-batch-normalization/grad1.png" alt="grad"><p class="caption">grad</p>
+</div>
+<p>Из данного алгоритма авторы также делают SGD c Momentum и ADAM.</p>
 <h1 id="регуляризация">Регуляризация</h1>
 <p>За чередой запутывающих незнакомого с римановскими многообразиями читателя формул с отсылками к книжкам с объяснениями следует небольшой раздел Regularization using variational inference, который по-началу тоже норовит блеснуть своей математичностью. По факту авторы говорят, что к предложенному методу неприменима довольно распростроненная L2 регуляризация (и правда – <span class="math inline">\(\|w\| = 1\)</span> всегда). Поэтому они предлагают (правда они?) довольно интересную регуляризацию, которая в итоге представляет следующий лосс:</p>
 <p><span class="math display">\[ \dfrac{\alpha}{2} \|W^T W - I\|^2_F = \dfrac{\alpha}{2} \sum_{i \neq j} \langle w_i, w_j \rangle^2 \]</span></p>
 <p>Минимум такого функционала достигается, когда все столбцы ортогональны друг другу. Таким образом запрещается сильная зависимость между столбцами матрицы.</p>
 <h1 id="эксперименты">Эксперименты</h1>
 <p>Авторы сравнивали свой подход с обычным batch normalization в аспекте скорости сходимости и качестве на валидационный выборке. Для этого они взяли несколько популярных архитектур и заменили стандартные слои батчнорма своей реализацией.</p>
-<p><img src="../../post-images/riemannian-approach-to-batch-normalization/speed.png"></p>
+<div class="figure">
+<img src="../../post-images/riemannian-approach-to-batch-normalization/speed.png">
+</div>
 <p>Про скорость сходимости они пишут, что для обучения с обычным батчнормом лосс уменьшается только при понижении learning rate, в то время как их имплементация уменьшает лосс постепенно. Неясно, что им мешало для обычных сетей уменьшать рейт линейно или сделать exponential decay и сравнить. Тем более, что предложенная процедура оптимизации медленнее обычного SGD или ADAM в 2.5-3.5 раз, как пишут авторы.</p>
 <p>Применив свою имплементацию и оптимизацию они смогли улучшить accuracy score для ряда известных архитектур, хоть и на немного</p>
-<p><img src="../../post-images/riemannian-approach-to-batch-normalization/table1.png"></p>
-<p><img src="../../post-images/riemannian-approach-to-batch-normalization/table3.png"></p>
+<div class="figure">
+<img src="../../post-images/riemannian-approach-to-batch-normalization/table1.png">
+</div>
+<div class="figure">
+<img src="../../post-images/riemannian-approach-to-batch-normalization/table3.png">
+</div>
 <p>В заключении авторы говорят, что данную технику можно применить также и для других техник нормализации – weight normalization, normalization propagation и layer normalization.</p>
 <h1 id="резюме">Резюме</h1>
 <p>Интересная, хоть и не новая, техника сведения задачи условной оптимизации к безусловной за счет использования римановских многообразий. Кроме того интересное и проработанное расширение обычного римановского SGD до популярных Momentum и ADAM и интересная регуляризация.</p>

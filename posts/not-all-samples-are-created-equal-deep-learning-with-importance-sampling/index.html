@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html prefix="og: http://ogp.me/ns# article: http://ogp.me/ns/article# " vocab="http://ogp.me/ns" lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<title>Not All Samples Are Created Equal: Deep Learning with Importance Sampling | Codename 'Sufficient Statistics'</title>
+<link href="../../assets/css/rst.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/poole.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/lanyon.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/code.css" rel="stylesheet" type="text/css">
+<link href="../../assets/css/custom.css" rel="stylesheet" type="text/css">
+<link rel="stylesheet" href="//fonts.googleapis.com/css?family=PT+Serif:400,400italic,700%7CPT+Sans:400">
+<link rel="canonical" href="http://bayesgroup.github.io/sufficient-statistics/posts/not-all-samples-are-created-equal-deep-learning-with-importance-sampling/">
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script><!--[if lt IE 9]><script src="../../assets/js/html5.js"></script><![endif]--><meta name="author" content="Артём Соболев">
+<link rel="prev" href="../improving-variational-encoder-decoders-in-dialogue-generation/" title="Improving Variational Encoder-Decoders in Dialogue Generation" type="text/html">
+<meta property="og:site_name" content="Codename 'Sufficient Statistics'">
+<meta property="og:title" content="Not All Samples Are Created Equal: Deep Learning with Importance Sampl">
+<meta property="og:url" content="http://bayesgroup.github.io/sufficient-statistics/posts/not-all-samples-are-created-equal-deep-learning-with-importance-sampling/">
+<meta property="og:description" content="Мотивация
+В машинном обучении некоторые обучающие примеры проще других, и довольно быстро они становятся бесполезны для обучения: модель и так выдаёт достаточно уверенные предсказания на них. Можем ли">
+<meta property="og:type" content="article">
+<meta property="article:published_time" content="2018-03-09T18:37:38+03:00">
+<meta property="article:tag" content="deep learning">
+<meta property="article:tag" content="mathjax">
+<meta property="article:tag" content="optimization">
+</head>
+<body>
+    <a href="#content" class="sr-only sr-only-focusable">Перейти к главному содержимому</a>
+    <!-- Target for toggling the sidebar `.sidebar-checkbox` is for regular
+            styles, `#sidebar-checkbox` for behavior. -->
+    <input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox"><!-- Toggleable sidebar --><div class="sidebar" id="sidebar">
+        <div class="sidebar-item">
+            <p>Обзоры не являются официальной позицией группы и предназначены исключительно для внутреннего использования.</p>
+        </div>
+        
+    <nav id="menu" role="navigation" class="sidebar-nav"><a class="sidebar-nav-item" href="../../authors/">Авторы</a>
+        <a class="sidebar-nav-item" href="../../archive.html">Архив</a>
+        <a class="sidebar-nav-item" href="../../categories/">Тэги</a>
+    
+    
+    </nav>
+</div>
+
+    <!-- Wrap is the content to shift when toggling the sidebar. We wrap the
+         content to avoid any CSS collisions with our real content. -->
+    <div class="wrap">
+      <div class="masthead">
+        <div class="container">
+          
+    <h3 id="brand" class="masthead-title">
+      <a href="../../" title="Codename 'Sufficient Statistics'" rel="home">Codename 'Sufficient Statistics'</a>
+    </h3>
+
+
+        </div>
+      </div>
+
+      <div class="container content" id="content">
+        
+<article class="post-text h-entry hentry postpage" itemscope="itemscope" itemtype="http://schema.org/Article"><div class="paper-link">
+        <a href="https://arxiv.org/abs/1803.00942">Paper</a>
+    </div>
+    <header><h1 class="post-title p-name entry-title" itemprop="headline name"><a href="." class="u-url">Not All Samples Are Created Equal: Deep Learning with Importance Sampling</a></h1>
+
+        
+        <ul itemprop="keywords" class="tags">
+<li><a class="tag p-category" href="../../categories/deep-learning/" rel="tag">deep learning</a></li>
+            <li><a class="tag p-category" href="../../categories/optimization/" rel="tag">optimization</a></li>
+        </ul></header><div class="e-content entry-content" itemprop="articleBody text">
+    <h1 id="мотивация">Мотивация</h1>
+<p>В машинном обучении некоторые обучающие примеры проще других, и довольно быстро они становятся бесполезны для обучения: модель и так выдаёт достаточно уверенные предсказания на них. Можем ли мы как-то тратить меньше времени на простые примеры и сконцентрироваться на сложных? Оказывается, если мы делаем стохастическую оптимизацию, то можно семплировать обучающие примеры не равномерно из всего датасета, а следуя какому-то хитрому распределению, а потом делать importance-sampling коррекцию.</p>
+<h1 id="описание-модели">Описание модели</h1>
+<p>Итак, мы хотим обучить некоторую нейросеть <span class="math inline">\(\Psi(\cdot, \Theta)\)</span> на датасете <span class="math inline">\(\mathcal{X} = \{(x_i, y_i)\}_{i=1}^N\)</span>, пользуясь функцией потерь <span class="math inline">\(\mathcal{L}(y_\text{pred}, y_\text{true})\)</span></p>
+<p><span class="math display">\[
+\mathbb{E}_{(x, y) \sim U(\mathcal{X})} \mathcal{L}(\Psi(x, \Theta), y) \to \min_\Theta
+\]</span></p>
+<p>Стохастические градиенты в такой модели</p>
+<p><span class="math display">\[
+G(\Theta) = \nabla_\Theta \mathcal{L}(\Psi(x_i, \Theta), y_i), \quad\quad i \sim U(|\mathcal{X}|)
+\]</span></p>
+<p>Введём предлагающее распределение <span class="math inline">\(Q(\mathcal{X})\)</span> и сделаем коррекцию на выборку по значимости:</p>
+<p><span class="math display">\[
+G(\Theta) = w_i \nabla_\Theta \mathcal{L}(\Psi(x_i, \Theta), y_i), \quad\quad i \sim Q(|\mathcal{X}|)
+\]</span></p>
+<p>где <span class="math inline">\(w_i = \tfrac{1}{|\mathcal{X}| Q(i)}\)</span> – обычная поправка для выборки по значимости.</p>
+<p>Как выбрать хорошее распределение <span class="math inline">\(Q\)</span>? Утверждается, что оптимальным (для уменьшения дисперсии градиента <a href="#fn1" class="footnote-ref" id="fnref1"><sup>1</sup></a>) распределением будет пропорциональное норме градиента для соответствующего индекса</p>
+<p><span class="math display">\[Q^*(i) \propto \|\nabla_{\Theta} \mathcal{L}(\Psi(x_i, \Theta), y_i)\|\]</span></p>
+<p>Однако, чтобы найти такое распределение в нейросети придётся сделать обратных проход каждого примера из обучающей выборки, т.е. одну полную эпоху (без апдейтов) только для того, чтобы понять, что семплировать! That’s not gonna work.</p>
+<h1 id="ускоряемся-раз">Ускоряемся раз</h1>
+<p>Поэтому вместо честной нормы авторы вводят верхнюю оценку на норму и сводят вопрос к норме градиента функции потерь по преактивациям выходов, мотивируя это тем, что благодаря батчнорму и друзьям именно эта штука варьируется значимее всего.</p>
+<p><span class="math display">\[
+\| \nabla_\Theta \mathcal{L}(\Psi(x_i; \Theta), y_i) \|_2
+\le
+L \rho \left\| \Sigma'(z_i^{(L)}) \nabla_{h_i^{(L)}} \mathcal{L}(\Psi(x_i; \Theta), y_i) \right\|_2
+\]</span></p>
+<p>где <span class="math inline">\(L\)</span> – номер последнего слоя, <span class="math inline">\(z_i^{(L)}\)</span> – его преактивации, <span class="math inline">\(h_i^{(L)}\)</span> – постактивации, а <span class="math inline">\(\Sigma'(x)\)</span> – диагональная матрица с производной итоговой функции активации <span class="math inline">\(\sigma_L\)</span> на главной диагонали, <span class="math inline">\(\Sigma'(x) = \text{diag}(\sigma_L'(x))\)</span></p>
+<p>Окей, теперь нам не нужен обратный проход, но полный прямой проход для всего датасета всё ещё остался.</p>
+<h1 id="ускоряемся-два">Ускоряемся два</h1>
+<p>Избавиться от него вряд ли удастся, поэтому тут авторы предлагают делать это не для всего датасета. А именно:</p>
+<ol type="1">
+<li>Взять случайный большой батч B.</li>
+<li>Посчитать <span class="math inline">\(Q\)</span> на этом батче.</li>
+<li>Семплируем (с возвращением) из этого батча по распределению <span class="math inline">\(Q\)</span> маленький батч b для обучения.</li>
+</ol>
+<p>Дальше авторы выводят формулу для изменения общей дисперсии градиента при замене равномерного семплирования из B на <span class="math inline">\(Q\)</span>, но говорят, что ей пользоваться не очень удобно, ибо это какое-то <span class="math inline">\(L_2\)</span> расстояние в квадрате, для него сложно ввести гиперпараметр-порог, чтобы понимать, когда пользоваться альтернативной схемой. Другое дело – посмотреть, насколько дисперсия уменьшилась относительно исходной (при равномерном семплировании) и какому увеличению батча это эквивалентно.</p>
+<p>Правда, в процессе авторы делают аж две ошибки: делят не на исходную дисперсию, а на исходный второй момент, а так же почему-то считают, что при увеличении размера выборки в <span class="math inline">\(\tau\)</span> раз <em>дисперсия</em> Монте Карло оценки уменьшится в <span class="math inline">\(\tau^2\)</span> раз (а на самом деле в <span class="math inline">\(\tau\)</span> раз, если для вас это не супер-очевидно, немедленно проделайте упражнение по выводу этого результата).</p>
+<p>В итоге авторы говорят, что уменьшение дисперсии эквивалентно увеличению батча в <span class="math inline">\(\tau\)</span> раз и</p>
+<p><span class="math display">\[
+\frac{1}{\tau} = \sqrt{1 - \frac{\|g - u\|^2}{\|g\|^2}}
+\]</span></p>
+<p>Где <span class="math inline">\(g\)</span> и <span class="math inline">\(u\)</span> – распределение примерах из батча <span class="math inline">\(B\)</span>, <span class="math inline">\(u\)</span> – равномерное, а <span class="math inline">\(g\)</span> – распределение для выборки по значимости, т.е. <span class="math inline">\(g_i \propto \|\nabla_{\Theta} \mathcal{L}(\Psi(x_i, \Theta), y_i)\|\)</span> (как <span class="math inline">\(Q^*(i)\)</span>, только с ограничением носителя на семплы из <span class="math inline">\(B\)</span>).</p>
+<p>Но на самом деле формула должна быть такой <a href="#fn2" class="footnote-ref" id="fnref2"><sup>2</sup></a></p>
+<p><span class="math display">\[
+\frac{1}{\tau}
+ = 1 - \frac{\|g - u\|^2}{\|g\|^2 - \frac{1}{B} \left(\frac{\left\|\sum_i G_i\right\|}{\sum_i \|G_i\|}\right)^2}
+ = 1 - \frac{\|g - u\|^2}{\|g\|^2 \left(1 - \frac{1}{B} \frac{\left\|\sum_i G_i\right\|^2}{\sum_i \|G_i\|^2}\right)}
+\]</span></p>
+<p>Получается, что предложенной схемой мы можем как бы увеличить эффективный размер батча в <span class="math inline">\(\tau\)</span> раз. Когда такое полезно? Когда мы на это потратим меньше вычислений, чем на обработку <span class="math inline">\(\tau\)</span>-кратного батча. А именно, в предложенной схеме нам нужно сделать один прямой проход по всем примерам из <span class="math inline">\(B\)</span> (чтобы посчитать предложенное распределение <span class="math inline">\(g\)</span>), а потом прямой и обратный для каждого примера из маленького батча <span class="math inline">\(b\)</span>. В предположении, что обратный проход в два раза дороже прямого получаем, что такая штука стоила бы нам <span class="math inline">\(B + 3b\)</span> операций, в то время как обычная обработка <span class="math inline">\(\tau\)</span>-кратного батча стоила бы <span class="math inline">\(3b \tau\)</span> операций. Соответственно, пользоваться предложенным методом разумно, когда <span class="math inline">\(B + 3b &lt; 3b \tau\)</span>, т.е. <span class="math inline">\(\tau &gt; 1 + \tfrac{B}{3b}\)</span>. <a href="#fn3" class="footnote-ref" id="fnref3"><sup>3</sup></a></p>
+<p>Итого, в предложенном методе мы ведём оптимизацию как обычно, равномерно семплируя обучающие примеры, но с каждым батчом обновляем нашу <span class="math inline">\(\tau\)</span> как экспоненциальное скользящее среднее. Как только <span class="math inline">\(\tau\)</span> становится меньше порога, равномерно семплируем примеры из <span class="math inline">\(B\)</span> с последующий ресемплированием по значимости в <span class="math inline">\(b\)</span>.</p>
+<p><img src="../../post-images/not-all-samples-are-created-equal-deep-learning-with-importance-sampling/algo1.png" class="medium"></p>
+<h1 id="эксперименты">Эксперименты</h1>
+<p>Для начала авторы показывают, что их метод уменьшает расстояние между средним градиентом по большому батчу и средним градиентом по маленькому батчу. Здесь loss – это метод, выбирающий примеры на основе значений функции потерь, а gradient-norm – это полный градиент без приближений верхней оценкой.</p>
+<p><img src="../../post-images/not-all-samples-are-created-equal-deep-learning-with-importance-sampling/fig1.png" class="medium"></p>
+<p>Потом они сравниваются с другими методами в терминах графика ошибки. Вроде как предложенный метод всегда ниже остальных</p>
+<p><img src="../../post-images/not-all-samples-are-created-equal-deep-learning-with-importance-sampling/fig3.png"></p>
+<p>Их метод помогает fine-tuning’у</p>
+<p><img src="../../post-images/not-all-samples-are-created-equal-deep-learning-with-importance-sampling/fig4.png"></p>
+<p>Но вот на т.н. permuted mnist (взяли mnist, перемешали все пиксели зафиксированной перестановкой, подаём пиксель-за-пикселем в LSTM’ку) <img src="../../post-images/not-all-samples-are-created-equal-deep-learning-with-importance-sampling/fig5.png"></p>
+<p>И сравнились (Appendix.C) с другими методами уменьшения дисперсии в стох. оптимизации</p>
+<p><img src="../../post-images/not-all-samples-are-created-equal-deep-learning-with-importance-sampling/fig6.png"></p>
+<h1 id="заключение">Заключение</h1>
+<p>Очень интересная идея, неплохие результаты, но большой косяк с формулой для <span class="math inline">\(\tau\)</span>. Возможно, после их исправления будет ещё лучше.</p>
+<section class="footnotes"><hr>
+<ol>
+<li id="fn1"><p>Неочевидно, разумная ли это идея in the first place. При оптимальном предложном распределении (по крайней мере в одномерном случае) дисперсия становится нулевой, а нам вроде как шум помогает нейросети обучать.<a href="#fnref1" class="footnote-back">↩</a></p></li>
+<li id="fn2"><p>Внимание! Я, конечно, подумал над формулой, когда её выводил, но голову на отсечение за её корректность не дам! Лучше выведите сами.<a href="#fnref2" class="footnote-back">↩</a></p></li>
+<li id="fn3"><p>В статье авторы говорят, что экспериментально показывают, что и <span class="math inline">\(\tau\)</span> меньше этого порога работают. Интересно, не оттого ли, что они неправильно считают <span class="math inline">\(\tau\)</span>?<a href="#fnref3" class="footnote-back">↩</a></p></li>
+</ol></section>
+</div>
+
+    <aside class="post-meta"><a class="post-author" href="../../authors/artiom-sobolev/">Артём Соболев</a>
+    <time class="post-date published dt-published" datetime="2018-03-09T18:37:38+03:00" itemprop="datePublished" title="09 марта 2018">09 марта 2018</time></aside><script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML" integrity="sha256-SDRP1VVYu+tgAGKhddBSl5+ezofHKZeI+OzxakbIe/Y=" crossorigin="anonymous"></script><script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+    tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"] ],
+        displayMath: [ ['$$','$$'], ["\\[","\\]"] ],
+        processEscapes: true
+    },
+    displayAlign: 'center', // Change this to 'left' if you want left-aligned equations.
+    "HTML-CSS": {
+        styles: {'.MathJax_Display': {"margin": 0}}
+    }
+});
+</script></article>
+</div>
+    </div>
+    <label for="sidebar-checkbox" class="sidebar-toggle"></label>
+    
+    
+        <footer id="footer"><p>Contents © 2018         <a href="mailto:info@bayesgroup.ru">BayesGroup</a> - Powered by         <a href="https://getnikola.com" rel="nofollow">Nikola</a>         </p>
+            
+        </footer><script src="../../assets/js/jquery.min.js"></script><script src="../../assets/js/moment-with-locales.min.js"></script><script src="../../assets/js/fancydates.js"></script><!-- fancy dates --><script>
+    moment.locale("ru");
+    fancydates(2, "DD.MM.YYYY");
+    </script><!-- end fancy dates -->
+</body>
+</html>
